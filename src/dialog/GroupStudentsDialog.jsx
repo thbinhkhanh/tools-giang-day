@@ -201,30 +201,49 @@ return (
   <Dialog
     open={open}
     onClose={(event, reason) => {
-        if (
+      if (
         reason === "backdropClick" ||
         reason === "escapeKeyDown"
-        ) {
+      ) {
         return;
-        }
-        handleClose();
+      }
+      handleClose();
     }}
     disableEscapeKeyDown
     fullWidth
-    maxWidth="md"
+    maxWidth={false}
+    sx={{
+      "& .MuiDialog-container": {
+        alignItems: "center",
+      },
+      "& .MuiDialog-paper": {
+        margin: { xs: "8px", sm: "32px" },
+      },
+    }}
     TransitionComponent={Fade}
     PaperProps={{
-        sx: {
-        borderRadius: 4,
+      sx: {
+        borderRadius: { xs: 4, sm: 4 },
         overflow: "hidden",
         background: "#fff",
         boxShadow: "0 25px 80px rgba(15,23,42,.25)",
         position: "relative",
-        height: "94dvh",
-        maxHeight: "94dvh",
+
+        width: {
+          xs: "calc(100vw - 16px)",
+          sm: "calc(100% - 64px)",
+        },
+        maxWidth: {
+          xs: "calc(100vw - 16px)",
+          sm: "900px",
+        },
+
+        height: { xs: "96%", sm: "94%" },
+        maxHeight: { xs: "96%", sm: "94%" },
+
         display: "flex",
         flexDirection: "column",
-        },
+      },
     }}
   >
     {/* HEADER */}
