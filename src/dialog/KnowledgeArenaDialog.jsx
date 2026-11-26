@@ -83,13 +83,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
 
   const current = questions[currentIndex];
   const [selectedClass, setSelectedClass] = useState("");
-  const [selectedWeek, setSelectedWeek] = useState(() => {
-    return (
-      localStorage.getItem("tuan") ||
-      localStorage.getItem("tools_tuan") ||
-      ""
-    );
-  });
+  const [selectedWeek, setSelectedWeek] = useState("");
   const [selectedSubject] = useState(
     localStorage.getItem("tools_mon") || "Tin học"
   );
@@ -106,7 +100,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
     : 0;
   
   // =====================================================
-  // LẤY LỚP ĐANG CHỌN VÀ TUẦN
+  // LẤY LỚP VÀ TUẦN TỪ USERS/{username}
   // =====================================================
   useEffect(() => {
     if (!open) return;
@@ -125,20 +119,14 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           currentUser?.username || ""
         ).trim().toLowerCase();
 
-        const week =
-          localStorage.getItem("tuan") ||
-          localStorage.getItem("tools_tuan") ||
-          "";
-
-        setSelectedWeek(String(week).trim());
-
         if (!username) {
           setSelectedClass("");
+          setSelectedWeek("");
           setQuestions([]);
           return;
         }
 
-        // Lấy lớp đang chọn từ Firestore
+        // Lấy thông tin lớp và tuần từ USERS
         const userRef = doc(db, "USERS", username);
         const userSnap = await getDoc(userRef);
 
@@ -146,6 +134,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
 
         if (!userSnap.exists()) {
           setSelectedClass("");
+          setSelectedWeek("");
           setQuestions([]);
           return;
         }
@@ -156,15 +145,18 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           userData.lopDangChon || userData.lopDay || ""
         ).trim();
 
-        setSelectedClass(className);
+        const weekValue =
+          String(userData.tuan ?? "").match(/\d+/)?.[0] || "";
 
-        if (!className || !week) {
+        setSelectedClass(className);
+        setSelectedWeek(weekValue);
+
+        if (!className || !weekValue) {
           setQuestions([]);
           return;
         }
 
-        const grade =
-          className.match(/\d+/)?.[0] || "";
+        const grade = className.match(/\d+/)?.[0] || "";
 
         if (!grade) {
           setQuestions([]);
@@ -172,7 +164,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
         }
 
         // ID tài liệu: quiz_Lớp 4_12
-        const documentId = `quiz_Lớp ${grade}_${week}`;
+        const documentId = `quiz_Lớp ${grade}_${weekValue}`;
 
         const quizRef = doc(
           db,
@@ -198,8 +190,9 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           );
         } else {
           setQuestions([]);
+
           console.warn(
-            `Không tìm thấy đề lớp ${className}, tuần ${week}`
+            `Không tìm thấy đề lớp ${className}, tuần ${weekValue}`
           );
         }
       } catch (error) {

@@ -311,18 +311,54 @@ useEffect(() => {
   };
 }, [open]);
 
-  // Tuần học được chọn từ Tools.jsx
-  const [week, setWeek] = useState(() => {
-    const savedWeek = localStorage.getItem("tools_tuan");
-    return savedWeek ? Number(savedWeek) : "";
-  });
+  // Tuần học lấy từ USERS/{username}/tuan
+  const [week, setWeek] = useState("");
 
-  // Cập nhật tuần đã chọn khi mở trò chơi
   useEffect(() => {
     if (!open) return;
 
-    const savedWeek = localStorage.getItem("tools_tuan");
-    setWeek(savedWeek ? Number(savedWeek) : "");
+    let cancelled = false;
+
+    const loadSelectedWeek = async () => {
+      try {
+        const currentUser = JSON.parse(
+          localStorage.getItem("tools_user") || "null"
+        );
+
+        const username = String(
+          currentUser?.username || ""
+        ).trim().toLowerCase();
+
+        if (!username) {
+          setWeek("");
+          return;
+        }
+
+        const userRef = doc(db, "USERS", username);
+        const userSnap = await getDoc(userRef);
+
+        if (cancelled) return;
+
+        if (userSnap.exists()) {
+          const weekValue = String(
+            userSnap.data().tuan ?? ""
+          ).match(/\d+/)?.[0] || "";
+
+          setWeek(weekValue ? Number(weekValue) : "");
+        } else {
+          setWeek("");
+        }
+      } catch (error) {
+        console.error("Lỗi tải tuần học:", error);
+        if (!cancelled) setWeek("");
+      }
+    };
+
+    loadSelectedWeek();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   const [themeId, setThemeId] = useState("tropical");
