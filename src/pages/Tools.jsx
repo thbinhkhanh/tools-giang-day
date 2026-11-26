@@ -897,14 +897,15 @@ useEffect(() => {
               (uploadedStudents || !loadingStudents))
         ).length;
 
-  return (
+  
+return (
   <Box
     sx={{
       minHeight: "100vh",
       width: "100%",
       boxSizing: "border-box",
       overflowX: "hidden",
-      p: { xs: 1.5, sm: 2.5, md: 3 },
+      p: { xs: 1, sm: 2.5, md: 3 },
       background:
         "radial-gradient(circle at 5% 0%, #dbeafe 0, transparent 28%), radial-gradient(circle at 95% 15%, #ede9fe 0, transparent 25%), #f4f7fc",
     }}
@@ -915,11 +916,10 @@ useEffect(() => {
         mx: "auto",
       }}
     >
-      {/* CARD TRẮNG DUY NHẤT */}
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 1.5, sm: 2.5, md: 3 },
+          p: { xs: 1, sm: 2.5, md: 3 },
           borderRadius: { xs: 3, sm: 4 },
           background: "#fff",
           border: "1px solid #e2e8f0",
@@ -968,8 +968,8 @@ useEffect(() => {
             sx={{
               position: "relative",
               zIndex: 1,
-              px: { xs: 2, sm: 3.5, md: 4 },
-              py: { xs: 2.5, sm: 3.5 },
+              px: { xs: 1.5, sm: 3.5, md: 4 },
+              py: { xs: 1.5, sm: 3.5 },
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -980,14 +980,14 @@ useEffect(() => {
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: { xs: 1.5, sm: 2.2 },
+                gap: { xs: 1.2, sm: 2.2 },
                 minWidth: 0,
               }}
             >
               <Box
                 sx={{
-                  width: { xs: 48, sm: 62 },
-                  height: { xs: 48, sm: 62 },
+                  width: { xs: 42, sm: 62 },
+                  height: { xs: 42, sm: 62 },
                   flexShrink: 0,
                   borderRadius: 3,
                   display: "flex",
@@ -997,7 +997,7 @@ useEffect(() => {
                   border: "1px solid rgba(255,255,255,0.25)",
                   boxShadow: "0 5px 18px rgba(0,0,0,0.12)",
                   "& svg": {
-                    fontSize: { xs: 29, sm: 36 },
+                    fontSize: { xs: 25, sm: 36 },
                   },
                 }}
               >
@@ -1007,7 +1007,7 @@ useEffect(() => {
               <Box sx={{ minWidth: 0 }}>
                 <Typography
                   sx={{
-                    fontSize: { xs: 17, sm: 23, md: 26 },
+                    fontSize: { xs: 15, sm: 23, md: 26 },
                     fontWeight: 900,
                     letterSpacing: { xs: 0, sm: 0.4 },
                     lineHeight: 1.3,
@@ -1018,8 +1018,8 @@ useEffect(() => {
 
                 <Typography
                   sx={{
-                    mt: 0.7,
-                    fontSize: { xs: 11.5, sm: 13 },
+                    mt: { xs: 0.3, sm: 0.7 },
+                    fontSize: { xs: 10.5, sm: 13 },
                     color: "rgba(255,255,255,0.82)",
                     lineHeight: 1.5,
                   }}
@@ -1030,320 +1030,467 @@ useEffect(() => {
             </Box>
           </Box>
 
-          {/* CÁC NÚT ĐIỀU KHIỂN */}
-          
-<Box
-  sx={{
-    position: "relative",
-    zIndex: 1,
-    px: { xs: 2, sm: 3.5, md: 4 },
-    pb: { xs: 2.5, sm: 3 },
-    display: "flex",
-    alignItems: "center",
-    gap: 1,
-    flexWrap: "wrap",
-  }}
->
-  {/* 1. CHỌN TUẦN */}
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      px: 1.5,
-      height: 56,
-      boxSizing: "border-box",
-      borderRadius: 2.5,
-      background: "rgba(255,255,255,0.13)",
-      border: "1px solid rgba(255,255,255,0.13)",
-    }}
-  >
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#bfdbfe",
-        "& svg": { fontSize: 19 },
-      }}
-    >
-      <TimerRoundedIcon />
-    </Box>
+          {/* ================= ĐIỀU KHIỂN DESKTOP ================= */}
+          <Box
+            sx={{
+              position: "relative",
+              zIndex: 1,
+              px: { xs: 2, sm: 3.5, md: 4 },
+              pb: { xs: 2, sm: 3 },
+              display: { xs: "none", sm: "flex" },
+              alignItems: "center",
+              gap: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            {/* 1. CHỌN TUẦN */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.5,
+                height: 56,
+                boxSizing: "border-box",
+                borderRadius: 2.5,
+                background: "rgba(255,255,255,0.13)",
+                border: "1px solid rgba(255,255,255,0.13)",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#bfdbfe",
+                  "& svg": { fontSize: 19 },
+                }}
+              >
+                <TimerRoundedIcon />
+              </Box>
 
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <TextField
-        select
-        variant="standard"
-        value={week}
-        onChange={handleWeekChange}
-        SelectProps={{ displayEmpty: true }}
-        InputProps={{ disableUnderline: true }}
-        sx={{
-          minWidth: 85,
-          "& .MuiInputBase-root": {
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 900,
-            lineHeight: 1.2,
-          },
-          "& .MuiSelect-select": {
-            py: 0,
-            pr: "20px !important",
-          },
-          "& .MuiSelect-icon": {
-            color: "#bfdbfe",
-            fontSize: 18,
-          },
-        }}
-      >
-        <MenuItem value="">
-          <em>Chọn tuần</em>
-        </MenuItem>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
+                <TextField
+                  select
+                  variant="standard"
+                  value={week}
+                  onChange={handleWeekChange}
+                  SelectProps={{ displayEmpty: true }}
+                  InputProps={{ disableUnderline: true }}
+                  sx={{
+                    minWidth: 85,
+                    "& .MuiInputBase-root": {
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 900,
+                      lineHeight: 1.2,
+                    },
+                    "& .MuiSelect-select": {
+                      py: 0,
+                      pr: "20px !important",
+                    },
+                    "& .MuiSelect-icon": {
+                      color: "#bfdbfe",
+                      fontSize: 18,
+                    },
+                  }}
+                >
+                  <MenuItem value="">
+                    <em>Chọn tuần</em>
+                  </MenuItem>
 
-        {Array.from({ length: 35 }, (_, index) => index + 1).map((item) => (
-          <MenuItem key={item} value={item}>
-            Tuần {item}
-          </MenuItem>
-        ))}
-      </TextField>
+                  {Array.from({ length: 35 }, (_, index) => index + 1).map(
+                    (item) => (
+                      <MenuItem key={item} value={item}>
+                        Tuần {item}
+                      </MenuItem>
+                    )
+                  )}
+                </TextField>
 
-      <Typography
-        sx={{
-          fontSize: 10,
-          color: "rgba(255,255,255,0.72)",
-          lineHeight: 1.2,
-        }}
-      >
-        Tuần học
-      </Typography>
-    </Box>
-  </Box>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.72)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Tuần học
+                </Typography>
+              </Box>
+            </Box>
 
-  {/* 2. CHỌN LỚP */}
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      px: 1.5,
-      height: 56,
-      boxSizing: "border-box",
-      borderRadius: 2.5,
-      background: "rgba(255,255,255,0.13)",
-      border: "1px solid rgba(255,255,255,0.13)",
-    }}
-  >
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#bfdbfe",
-        "& svg": { fontSize: 19 },
-      }}
-    >
-      <SchoolRoundedIcon />
-    </Box>
+            {/* 2. CHỌN LỚP */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.5,
+                height: 56,
+                boxSizing: "border-box",
+                borderRadius: 2.5,
+                background: "rgba(255,255,255,0.13)",
+                border: "1px solid rgba(255,255,255,0.13)",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#bfdbfe",
+                  "& svg": { fontSize: 19 },
+                }}
+              >
+                <SchoolRoundedIcon />
+              </Box>
 
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <TextField
-        select
-        variant="standard"
-        value={selectedClass}
-        onChange={(event) => setSelectedClass(event.target.value)}
-        InputProps={{ disableUnderline: true }}
-        sx={{
-          minWidth: 75,
-          "& .MuiInputBase-root": {
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 900,
-            lineHeight: 1.2,
-          },
-          "& .MuiSelect-select": {
-            py: 0,
-            pr: "20px !important",
-          },
-          "& .MuiSelect-icon": {
-            color: "#bfdbfe",
-            fontSize: 18,
-          },
-        }}
-      >
-        {registeredClasses.map((className) => (
-          <MenuItem key={className} value={className}>
-            Lớp {className}
-          </MenuItem>
-        ))}
-      </TextField>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
+                <TextField
+                  select
+                  variant="standard"
+                  value={selectedClass}
+                  onChange={(event) => setSelectedClass(event.target.value)}
+                  InputProps={{ disableUnderline: true }}
+                  sx={{
+                    minWidth: 75,
+                    "& .MuiInputBase-root": {
+                      color: "#fff",
+                      fontSize: 14,
+                      fontWeight: 900,
+                      lineHeight: 1.2,
+                    },
+                    "& .MuiSelect-select": {
+                      py: 0,
+                      pr: "20px !important",
+                    },
+                    "& .MuiSelect-icon": {
+                      color: "#bfdbfe",
+                      fontSize: 18,
+                    },
+                  }}
+                >
+                  {registeredClasses.map((className) => (
+                    <MenuItem key={className} value={className}>
+                      Lớp {className}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
-      <Typography
-        sx={{
-          fontSize: 10,
-          color: "rgba(255,255,255,0.72)",
-          lineHeight: 1.2,
-        }}
-      >
-        Lớp học
-      </Typography>
-    </Box>
-  </Box>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.72)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Lớp học
+                </Typography>
+              </Box>
+            </Box>
 
-  {/* 3. SĨ SỐ HỌC SINH */}
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "center",
-      gap: 1,
-      px: 1.5,
-      height: 56,
-      boxSizing: "border-box",
-      borderRadius: 2.5,
-      background: "rgba(255,255,255,0.13)",
-      border: "1px solid rgba(255,255,255,0.13)",
-    }}
-  >
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#bfdbfe",
-        "& svg": { fontSize: 19 },
-      }}
-    >
-      <GroupsRoundedIcon />
-    </Box>
+            {/* 3. SĨ SỐ HỌC SINH */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 1.5,
+                height: 56,
+                boxSizing: "border-box",
+                borderRadius: 2.5,
+                background: "rgba(255,255,255,0.13)",
+                border: "1px solid rgba(255,255,255,0.13)",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#bfdbfe",
+                  "& svg": { fontSize: 19 },
+                }}
+              >
+                <GroupsRoundedIcon />
+              </Box>
 
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: 14,
-          fontWeight: 900,
-          lineHeight: 1.2,
-          color: "#fff",
-        }}
-      >
-        {activeStudents.length}
-      </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 900,
+                    lineHeight: 1.2,
+                    color: "#fff",
+                  }}
+                >
+                  {activeStudents.length}
+                </Typography>
 
-      <Typography
-        sx={{
-          fontSize: 10,
-          color: "rgba(255,255,255,0.72)",
-          lineHeight: 1.2,
-        }}
-      >
-        Sĩ số học sinh
-      </Typography>
-    </Box>
-  </Box>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.72)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  Sĩ số học sinh
+                </Typography>
+              </Box>
+            </Box>
 
-  {/* 4. TẢI DANH SÁCH */}
-  <Button
-    component="label"
-    variant="contained"
-    size="small"
-    disabled={
-      accountStatus !== "active" ||
-      !selectedClass ||
-      uploadingExcel
-    }
-    startIcon={
-      uploadingExcel ? (
-        <CircularProgress size={19} color="inherit" />
-      ) : (
-        <CloudUploadRoundedIcon />
-      )
-    }
-    sx={{
-      alignSelf: "center",
-      height: 56,
-      minHeight: 56,
-      boxSizing: "border-box",
-      px: 1.5,
-      borderRadius: 2.5,
-      fontSize: 14,
-      fontWeight: 800,
-      textTransform: "none",
-      color: "#fff",
-      background: "rgba(255,255,255,0.2)",
-      border: "1px solid rgba(255,255,255,0.25)",
-      boxShadow: "none",
-      "& .MuiButton-startIcon": {
-        marginRight: 1,
-        "& svg": { fontSize: 19 },
-      },
-      "&:hover": {
-        background: "rgba(255,255,255,0.3)",
-        boxShadow: "none",
-      },
-    }}
-  >
-    {uploadingExcel ? "Đang tải..." : "Tải danh sách"}
+            {/* 4. TẢI DANH SÁCH */}
+            <Button
+              component="label"
+              variant="contained"
+              size="small"
+              disabled={
+                accountStatus !== "active" ||
+                !selectedClass ||
+                uploadingExcel
+              }
+              startIcon={
+                uploadingExcel ? (
+                  <CircularProgress size={19} color="inherit" />
+                ) : (
+                  <CloudUploadRoundedIcon />
+                )
+              }
+              sx={{
+                alignSelf: "center",
+                height: 56,
+                minHeight: 56,
+                boxSizing: "border-box",
+                px: 1.5,
+                borderRadius: 2.5,
+                fontSize: 14,
+                fontWeight: 800,
+                textTransform: "none",
+                color: "#fff",
+                background: "rgba(255,255,255,0.2)",
+                border: "1px solid rgba(255,255,255,0.25)",
+                boxShadow: "none",
+                "& .MuiButton-startIcon": {
+                  marginRight: 1,
+                  "& svg": { fontSize: 19 },
+                },
+                "&:hover": {
+                  background: "rgba(255,255,255,0.3)",
+                  boxShadow: "none",
+                },
+              }}
+            >
+              {uploadingExcel ? "Đang tải..." : "Tải danh sách"}
 
-    <input
-      hidden
-      type="file"
-      accept=".xlsx,.xls"
-      onChange={handleUploadStudentExcel}
-    />
-  </Button>
+              <input
+                hidden
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleUploadStudentExcel}
+              />
+            </Button>
 
-  {/* 5. TÀI KHOẢN */}
-  {currentUser.username?.trim().toLowerCase() === "thaipv" && (
-    <Button
-      variant="contained"
-      size="small"
-      startIcon={<PeopleAltRoundedIcon />}
-      onClick={() => setOpenAccountsDialog(true)}
-      sx={{
-        alignSelf: "center",
-        height: 56,
-        minHeight: 56,
-        boxSizing: "border-box",
-        px: 1.5,
-        borderRadius: 2.5,
-        fontSize: 14,
-        fontWeight: 800,
-        textTransform: "none",
-        color: "#fff",
-        background: "rgba(255,255,255,0.2)",
-        border: "1px solid rgba(255,255,255,0.25)",
-        boxShadow: "none",
-        "& .MuiButton-startIcon": {
-          marginRight: 1,
-          "& svg": { fontSize: 19 },
-        },
-        "&:hover": {
-          background: "rgba(255,255,255,0.3)",
-          boxShadow: "none",
-        },
-      }}
-    >
-      Tài khoản
-    </Button>
-  )}
-</Box>
+            {/* 5. TÀI KHOẢN */}
+            {currentUser.username?.trim().toLowerCase() === "thaipv" && (
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<PeopleAltRoundedIcon />}
+                onClick={() => setOpenAccountsDialog(true)}
+                sx={{
+                  alignSelf: "center",
+                  height: 56,
+                  minHeight: 56,
+                  boxSizing: "border-box",
+                  px: 1.5,
+                  borderRadius: 2.5,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  textTransform: "none",
+                  color: "#fff",
+                  background: "rgba(255,255,255,0.2)",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  boxShadow: "none",
+                  "& .MuiButton-startIcon": {
+                    marginRight: 1,
+                    "& svg": { fontSize: 19 },
+                  },
+                  "&:hover": {
+                    background: "rgba(255,255,255,0.3)",
+                    boxShadow: "none",
+                  },
+                }}
+              >
+                Tài khoản
+              </Button>
+            )}
+          </Box>
 
+          {/* ================= ĐIỀU KHIỂN MOBILE ================= */}
+          <Box
+            sx={{
+              display: { xs: "flex", sm: "none" },
+              position: "relative",
+              zIndex: 1,
+              alignItems: "center",
+              gap: 0.7,
+              px: 1.2,
+              pb: 1.3,
+            }}
+          >
+            {/* TUẦN */}
+            <TextField
+              select
+              size="small"
+              value={week}
+              onChange={handleWeekChange}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                "& .MuiOutlinedInput-root": {
+                  height: 36,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  bgcolor: "rgba(255,255,255,0.14)",
+                  borderRadius: 2,
+                  "& fieldset": {
+                    borderColor: "rgba(255,255,255,0.2)",
+                  },
+                },
+                "& .MuiSelect-icon": { color: "#fff" },
+              }}
+            >
+              <MenuItem value="">Tuần</MenuItem>
+              {Array.from({ length: 35 }, (_, i) => i + 1).map((item) => (
+                <MenuItem key={item} value={item}>
+                  Tuần {item}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* LỚP */}
+            <TextField
+              select
+              size="small"
+              value={selectedClass}
+              onChange={(event) => setSelectedClass(event.target.value)}
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                "& .MuiOutlinedInput-root": {
+                  height: 36,
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  bgcolor: "rgba(255,255,255,0.14)",
+                  borderRadius: 2,
+                  "& fieldset": {
+                    borderColor: "rgba(255,255,255,0.2)",
+                  },
+                },
+                "& .MuiSelect-icon": { color: "#fff" },
+              }}
+            >
+              {registeredClasses.map((className) => (
+                <MenuItem key={className} value={className}>
+                  Lớp {className}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* SĨ SỐ */}
+            <Box
+              sx={{
+                height: 36,
+                px: 0.8,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.4,
+                borderRadius: 2,
+                bgcolor: "rgba(255,255,255,0.14)",
+                color: "#fff",
+              }}
+            >
+              <GroupsRoundedIcon sx={{ fontSize: 16 }} />
+              <Typography fontSize={12} fontWeight={800}>
+                {activeStudents.length}
+              </Typography>
+            </Box>
+
+            {/* TẢI DANH SÁCH */}
+            <Tooltip title="Tải danh sách học sinh">
+              <span>
+                <IconButton
+                  component="label"
+                  disabled={
+                    accountStatus !== "active" ||
+                    !selectedClass ||
+                    uploadingExcel
+                  }
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    flexShrink: 0,
+                    color: "#fff",
+                    bgcolor: "rgba(255,255,255,0.2)",
+                    borderRadius: 2,
+                  }}
+                >
+                  {uploadingExcel ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <CloudUploadRoundedIcon fontSize="small" />
+                  )}
+                  <input
+                    hidden
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleUploadStudentExcel}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            {/* TÀI KHOẢN */}
+            {currentUser.username?.trim().toLowerCase() === "thaipv" && (
+              <Tooltip title="Quản lý tài khoản">
+                <IconButton
+                  onClick={() => setOpenAccountsDialog(true)}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    flexShrink: 0,
+                    color: "#fff",
+                    bgcolor: "rgba(255,255,255,0.2)",
+                    borderRadius: 2,
+                  }}
+                >
+                  <PeopleAltRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         </Box>
 
         {/* ================= TRẠNG THÁI DỮ LIỆU ================= */}
@@ -1361,7 +1508,6 @@ useEffect(() => {
             }}
           >
             <CircularProgress size={21} />
-
             <Typography
               sx={{
                 fontSize: 13,
@@ -1560,9 +1706,7 @@ useEffect(() => {
                           overflow: "hidden",
                           borderRadius: 3,
                           border: "1px solid",
-                          borderColor: disabled
-                            ? "#e2e8f0"
-                            : "#e5eaf2",
+                          borderColor: disabled ? "#e2e8f0" : "#e5eaf2",
                           background: disabled ? "#f8fafc" : "#fff",
                           cursor: disabled ? "not-allowed" : "pointer",
                           opacity: disabled ? 0.55 : 1,
@@ -1578,9 +1722,7 @@ useEffect(() => {
                             top: 0,
                             bottom: 0,
                             width: 3,
-                            background: disabled
-                              ? "#cbd5e1"
-                              : group.color,
+                            background: disabled ? "#cbd5e1" : group.color,
                             opacity: disabled ? 0.5 : 0.9,
                           },
 
@@ -1657,7 +1799,10 @@ useEffect(() => {
                               sx={{
                                 fontSize: 10,
                                 fontWeight: 700,
-                                color: accountStatus !== "active" ? "#dc2626" : "#b45309",
+                                color:
+                                  accountStatus !== "active"
+                                    ? "#dc2626"
+                                    : "#b45309",
                                 mt: 0.6,
                               }}
                             >
@@ -1730,42 +1875,43 @@ useEffect(() => {
       open={openAccountsDialog}
       onClose={() => setOpenAccountsDialog(false)}
     />
-      
-      {/* SNACKBAR THÔNG BÁO TẢI DANH SÁCH */}
-      <Snackbar
-        open={uploadMessage.open}
-        autoHideDuration={4000}
-        anchorOrigin={{
-          vertical: "bottom",
-          horizontal: "right",
-        }}
-        onClose={(event, reason) => {
-          if (reason === "clickaway") return;
 
+    {/* SNACKBAR THÔNG BÁO TẢI DANH SÁCH */}
+    <Snackbar
+      open={uploadMessage.open}
+      autoHideDuration={4000}
+      anchorOrigin={{
+        vertical: "bottom",
+        horizontal: "right",
+      }}
+      onClose={(event, reason) => {
+        if (reason === "clickaway") return;
+
+        setUploadMessage((prev) => ({
+          ...prev,
+          open: false,
+        }));
+      }}
+    >
+      <Alert
+        onClose={() =>
           setUploadMessage((prev) => ({
             ...prev,
             open: false,
-          }));
+          }))
+        }
+        severity={uploadMessage.type}
+        variant="filled"
+        sx={{
+          width: "100%",
+          fontWeight: 600,
+          borderRadius: 2,
         }}
       >
-        <Alert
-          onClose={() =>
-            setUploadMessage((prev) => ({
-              ...prev,
-              open: false,
-            }))
-          }
-          severity={uploadMessage.type}
-          variant="filled"
-          sx={{
-            width: "100%",
-            fontWeight: 600,
-            borderRadius: 2,
-          }}
-        >
-          {uploadMessage.text}
-        </Alert>
-      </Snackbar>
+        {uploadMessage.text}
+      </Alert>
+    </Snackbar>
   </Box>
 );
+
 }
