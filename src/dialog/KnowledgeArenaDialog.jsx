@@ -1,4 +1,6 @@
+
 import React, { useEffect, useState } from "react";
+
 import {
   Dialog,
   DialogContent,
@@ -33,14 +35,18 @@ import DialogHeader from "../dialog/DialogHeader";
 import ArenaConfigDialog from "../dialog/ArenaConfigDialog";
 import QuestionEditorDialog from "../dialog/QuestionEditorDialog";
 
-const createQuestion = () => ({
-  id: Date.now() + Math.random(),
-  question: "",
-  options: ["", "", "", ""],
-  answerIndex: 0,
-});
+import {
+  QuestionPlayer,
+  normalizeQuestions,
+  validateQuestion,
+  createEmptyAnswer,
+  checkAnswer,
+  getQuestionTypeLabel,
+} from "../components/QuestionEngine";
 
-const OPTION_LABELS = ["A", "B", "C", "D"];
+// =====================================================
+// CẤU HÌNH
+// =====================================================
 
 const paperSx = {
   borderRadius: 3,
@@ -55,25 +61,101 @@ const primaryButtonSx = {
   textTransform: "none",
   background: "linear-gradient(90deg,#2563eb,#0ea5e9)",
   boxShadow: "0 5px 14px rgba(37,99,235,.18)",
+
   "&:hover": {
     background: "linear-gradient(90deg,#1d4ed8,#0284c7)",
   },
+
   "&.Mui-disabled": {
     color: "#fff",
     opacity: 0.45,
   },
 };
 
+// =====================================================
+// TẠO NỘI DUNG ĐÁP ÁN ĐÚNG CHO 6 DẠNG CÂU HỎI
+// =====================================================
+
+const getCorrectAnswerText = (question) => {
+  if (!question) return "";
+
+  const options = Array.isArray(question.options)
+    ? question.options
+    : [];
+
+  switch (question.type) {
+    case "single": {
+      const index = Number(question.correctIndex);
+
+      return options[index] ?? "";
+    }
+
+    case "multiple": {
+      const indexes = Array.isArray(question.correctIndexes)
+        ? question.correctIndexes
+        : [];
+
+      return indexes
+        .map((index) => options[Number(index)])
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    case "true_false":
+      return question.correctAnswer === true ? "Đúng" : "Sai";
+
+    case "ordering": {
+      const order = Array.isArray(question.correctOrder)
+        ? question.correctOrder
+        : [];
+
+      return order
+        .map((index) => options[Number(index)] ?? String(index))
+        .join(" → ");
+    }
+
+    case "fill_blank": {
+      const answers = Array.isArray(question.acceptedAnswers)
+        ? question.acceptedAnswers
+        : [];
+
+      return answers.join(" / ");
+    }
+
+    case "matching": {
+      const pairs = Array.isArray(question.pairs)
+        ? question.pairs
+        : [];
+
+      return pairs
+        .map((pair) => `${pair.left} ↔ ${pair.right}`)
+        .join("; ");
+    }
+
+    default:
+      return "";
+  }
+};
+
+// =====================================================
+// COMPONENT
+// =====================================================
+
 export default function KnowledgeArenaDialog({ open, onClose }) {
-  const [questions, setQuestions] = useState([createQuestion()]);
+  const [questions, setQuestions] = useState([]);
+
   const [duration, setDuration] = useState(20);
 
   const [phase, setPhase] = useState("setup");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [seconds, setSeconds] = useState(20);
 
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  // Đáp án dùng chung cho cả 6 dạng câu hỏi
+  const [answer, setAnswer] = useState(null);
+
   const [answered, setAnswered] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [timeOut, setTimeOut] = useState(false);
 
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
@@ -81,27 +163,39 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
   const [configOpen, setConfigOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
 
-  const current = questions[currentIndex];
   const [selectedClass, setSelectedClass] = useState("");
   const [selectedWeek, setSelectedWeek] = useState("");
+
   const [selectedSubject] = useState(
     localStorage.getItem("tools_mon") || "Tin học"
   );
+
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
-  const validQuestionCount = questions.filter(
-    (item) =>
-      item.question.trim() &&
-      item.options.every((option) => option.trim())
-  ).length;
+  const current = questions[currentIndex];
+
+  // =====================================================
+  // ĐẾM CÂU HỎI HỢP LỆ
+  // =====================================================
+
+  const validQuestionCount = questions.filter((item) => {
+    try {
+      return validateQuestion(item).valid;
+    } catch (error) {
+      return false;
+    }
+  }).length;
 
   const progress = questions.length
     ? ((currentIndex + 1) / questions.length) * 100
     : 0;
-  
+
+  const correctAnswerText = getCorrectAnswerText(current);
+
   // =====================================================
   // LẤY LỚP VÀ TUẦN TỪ USERS/{username}
   // =====================================================
+
   useEffect(() => {
     if (!open) return;
 
@@ -117,7 +211,9 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
 
         const username = String(
           currentUser?.username || ""
-        ).trim().toLowerCase();
+        )
+          .trim()
+          .toLowerCase();
 
         if (!username) {
           setSelectedClass("");
@@ -126,7 +222,6 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           return;
         }
 
-        // Lấy thông tin lớp và tuần từ USERS
         const userRef = doc(db, "USERS", username);
         const userSnap = await getDoc(userRef);
 
@@ -163,7 +258,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           return;
         }
 
-        // ID tài liệu: quiz_Lớp 4_12
+        // Giữ nguyên ID tài liệu hiện tại
         const documentId = `quiz_Lớp ${grade}_${weekValue}`;
 
         const quizRef = doc(
@@ -183,11 +278,11 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
         if (quizSnap.exists()) {
           const data = quizSnap.data();
 
-          setQuestions(
-            Array.isArray(data.questions) && data.questions.length > 0
-              ? data.questions
-              : [createQuestion()]
+          const loadedQuestions = normalizeQuestions(
+            data.questions || []
           );
+
+          setQuestions(loadedQuestions);
         } else {
           setQuestions([]);
 
@@ -196,7 +291,10 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           );
         }
       } catch (error) {
-        console.error("Lỗi tải đề Đấu trường kiến thức:", error);
+        console.error(
+          "Lỗi tải đề Đấu trường kiến thức:",
+          error
+        );
 
         if (!cancelled) {
           setQuestions([]);
@@ -215,17 +313,27 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
     };
   }, [open, selectedSubject]);
 
-  /* ĐẾM NGƯỢC */
+  // =====================================================
+  // ĐẾM NGƯỢC
+  // =====================================================
+
   useEffect(() => {
-    if (!open || phase !== "playing" || answered) return;
+    if (!open || phase !== "playing" || answered) {
+      return;
+    }
 
     const timer = setInterval(() => {
       setSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
+
           setAnswered(true);
+          setIsCorrect(false);
+          setTimeOut(true);
+
           return 0;
         }
+
         return prev - 1;
       });
     }, 1000);
@@ -233,13 +341,32 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
     return () => clearInterval(timer);
   }, [open, phase, currentIndex, answered]);
 
-  /* BẮT ĐẦU */
-  const startGame = () => {
-    const validQuestions = questions.filter(
-      (item) =>
-        item.question.trim() &&
-        item.options.every((option) => option.trim())
+  // =====================================================
+  // RESET TRẠNG THÁI CÂU HỎI
+  // =====================================================
+
+  const resetCurrentAnswer = (question) => {
+    setAnswer(
+      createEmptyAnswer(question?.type)
     );
+
+    setAnswered(false);
+    setIsCorrect(false);
+    setTimeOut(false);
+  };
+
+  // =====================================================
+  // BẮT ĐẦU
+  // =====================================================
+
+  const startGame = () => {
+    const validQuestions = questions.filter((item) => {
+      try {
+        return validateQuestion(item).valid;
+      } catch (error) {
+        return false;
+      }
+    });
 
     if (!validQuestions.length) {
       setEditorOpen(true);
@@ -247,68 +374,113 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
     }
 
     setQuestions(validQuestions);
+
     setCurrentIndex(0);
     setSeconds(duration);
-    setSelectedAnswer(null);
+
+    setAnswer(
+      createEmptyAnswer(validQuestions[0]?.type)
+    );
+
     setAnswered(false);
+    setIsCorrect(false);
+    setTimeOut(false);
+
     setScore(0);
     setCorrectCount(0);
+
     setPhase("playing");
   };
 
-  /* CHỌN ĐÁP ÁN */
-  const chooseAnswer = (index) => {
+  // =====================================================
+  // KIỂM TRA ĐÁP ÁN
+  // ĐƯỢC GỌI TỪ QUESTIONPLAYER
+  // =====================================================
+
+  const handleQuestionCheck = (result) => {
     if (answered || !current) return;
 
-    setSelectedAnswer(index);
-    setAnswered(true);
+    const correct = Boolean(result?.isCorrect);
 
-    if (index === current.answerIndex) {
+    setAnswered(true);
+    setIsCorrect(correct);
+    setTimeOut(false);
+
+    if (correct) {
       setScore((prev) => prev + 10);
       setCorrectCount((prev) => prev + 1);
     }
   };
 
-  /* CÂU TIẾP THEO */
+  // =====================================================
+  // CÂU TIẾP THEO
+  // =====================================================
+
   const nextQuestion = () => {
+    if (!answered) return;
+
     if (currentIndex >= questions.length - 1) {
       setPhase("result");
       return;
     }
 
-    setCurrentIndex((prev) => prev + 1);
+    const nextIndex = currentIndex + 1;
+    const next = questions[nextIndex];
+
+    setCurrentIndex(nextIndex);
     setSeconds(duration);
-    setSelectedAnswer(null);
-    setAnswered(false);
+
+    resetCurrentAnswer(next);
   };
 
-  /* CHƠI LẠI */
+  // =====================================================
+  // CHƠI LẠI
+  // =====================================================
+
   const restartGame = () => {
     setPhase("setup");
+
     setCurrentIndex(0);
     setSeconds(duration);
-    setSelectedAnswer(null);
+
+    setAnswer(null);
+
     setAnswered(false);
+    setIsCorrect(false);
+    setTimeOut(false);
+
     setScore(0);
     setCorrectCount(0);
   };
 
-  /* ĐÓNG */
-  const handleClose = (event, reason) => {
-    // Không đóng khi bấm ra ngoài Dialog
-    if (reason === "backdropClick") return;
+  // =====================================================
+  // ĐÓNG
+  // =====================================================
 
+  const handleClose = () => {
     setPhase("setup");
+
     setCurrentIndex(0);
     setSeconds(duration);
-    setSelectedAnswer(null);
+
+    setAnswer(null);
+
     setAnswered(false);
+    setIsCorrect(false);
+    setTimeOut(false);
+
     setScore(0);
     setCorrectCount(0);
+
     setConfigOpen(false);
     setEditorOpen(false);
+
     onClose?.();
-    };
+  };
+
+  // =====================================================
+  // GIAO DIỆN
+  // =====================================================
 
   return (
     <>
@@ -321,6 +493,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           ) {
             return;
           }
+
           handleClose();
         }}
         disableEscapeKeyDown
@@ -330,6 +503,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           "& .MuiDialog-container": {
             alignItems: "center",
           },
+
           "& .MuiDialog-paper": {
             margin: { xs: "8px", sm: "32px" },
           },
@@ -341,10 +515,12 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
               xs: "calc(100vw - 16px)",
               sm: "calc(100% - 64px)",
             },
+
             maxWidth: {
               xs: "calc(100vw - 16px)",
               sm: "900px",
             },
+
             height: { xs: "96%", sm: "94%" },
             maxHeight: { xs: "96%", sm: "94%" },
 
@@ -357,10 +533,13 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
           },
         }}
       >
-        {/* HEADER CỐ ĐỊNH */}
+        {/* HEADER */}
+
         <DialogHeader
           title="ĐẤU TRƯỜNG KIẾN THỨC"
-          subtitle={`Lớp ${selectedClass || "Chưa chọn"} · Tuần ${selectedWeek || "Chưa chọn"} · Thử thách kiến thức`}
+          subtitle={`Lớp ${selectedClass || "Chưa chọn"} · Tuần ${
+            selectedWeek || "Chưa chọn"
+          } · Thử thách kiến thức`}
           icon={<EmojiEventsRoundedIcon sx={{ fontSize: 27 }} />}
           onClose={handleClose}
         >
@@ -368,7 +547,10 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
             <Stack
               direction="row"
               spacing={0.7}
-              sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}
+              sx={{
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+              }}
             >
               <Chip
                 icon={<SettingsRoundedIcon />}
@@ -380,9 +562,13 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   bgcolor: "rgba(255,255,255,.13)",
                   border: "1px solid rgba(255,255,255,.2)",
                   fontWeight: 700,
-                  "& .MuiChip-icon": { color: "#bfdbfe" },
+
+                  "& .MuiChip-icon": {
+                    color: "#bfdbfe",
+                  },
                 }}
               />
+
               <Chip
                 icon={<EditNoteRoundedIcon />}
                 label="Soạn đề"
@@ -393,26 +579,34 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   bgcolor: "rgba(255,255,255,.13)",
                   border: "1px solid rgba(255,255,255,.2)",
                   fontWeight: 700,
-                  "& .MuiChip-icon": { color: "#bfdbfe" },
+
+                  "& .MuiChip-icon": {
+                    color: "#bfdbfe",
+                  },
                 }}
               />
             </Stack>
           )}
         </DialogHeader>
 
-        {/* CHỈ VÙNG NÀY ĐƯỢC CUỘN */}
+        {/* VÙNG NỘI DUNG */}
+
         <DialogContent
-                    sx={{
-                        p: { xs: 1.5, sm: 2 },
-                        flex: "1 1 0",
-                        minHeight: 0,
-                        overflow: "hidden",
-                        bgcolor: "#f8fbff",
-                        display: "flex",
-                        flexDirection: "column",
-                    }}
-                >
-          {/* MÀN HÌNH CHỜ */}
+          sx={{
+            p: { xs: 1.5, sm: 2 },
+            flex: "1 1 0",
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            bgcolor: "#f8fbff",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {/* =========================================
+              MÀN HÌNH CHỜ
+          ========================================= */}
+
           {phase === "setup" && (
             <Stack
               spacing={2}
@@ -444,7 +638,8 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     color: "#fff",
                     background:
                       "linear-gradient(145deg,#fbbf24,#ea580c)",
-                    boxShadow: "0 7px 20px rgba(245,158,11,.25)",
+                    boxShadow:
+                      "0 7px 20px rgba(245,158,11,.25)",
                   }}
                 >
                   <EmojiEventsRoundedIcon sx={{ fontSize: 38 }} />
@@ -471,6 +666,8 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   Hãy chuẩn bị và bắt đầu thử thách kiến thức của bạn.
                 </Typography>
               </Paper>
+
+              {/* THỐNG KÊ */}
 
               <Box
                 sx={{
@@ -526,6 +723,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     >
                       {item.icon}
                     </Box>
+
                     <Typography
                       sx={{
                         fontSize: { xs: 17, sm: 21 },
@@ -535,6 +733,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     >
                       {item.value}
                     </Typography>
+
                     <Typography
                       sx={{
                         mt: 0.2,
@@ -549,6 +748,8 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 ))}
               </Box>
 
+              {/* HƯỚNG DẪN */}
+
               <Paper
                 elevation={0}
                 sx={{
@@ -562,7 +763,10 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   alignItems="center"
                   spacing={1.2}
                 >
-                  <AutoAwesomeRoundedIcon sx={{ color: "#2563eb" }} />
+                  <AutoAwesomeRoundedIcon
+                    sx={{ color: "#2563eb" }}
+                  />
+
                   <Box sx={{ flex: 1 }}>
                     <Typography
                       sx={{
@@ -573,6 +777,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     >
                       HƯỚNG DẪN THAM GIA
                     </Typography>
+
                     <Typography
                       sx={{
                         mt: 0.4,
@@ -581,12 +786,15 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                         color: "#64748b",
                       }}
                     >
-                      Mỗi câu có 4 phương án. Chọn một đáp án đúng trong
-                      thời gian quy định để nhận 10 điểm.
+                      Trả lời các dạng câu hỏi khác nhau trong thời
+                      gian quy định. Mỗi câu trả lời đúng được cộng
+                      10 điểm.
                     </Typography>
                   </Box>
                 </Stack>
               </Paper>
+
+              {/* TRẠNG THÁI TẢI */}
 
               {loadingQuestions && (
                 <Box
@@ -599,13 +807,19 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   }}
                 >
                   <CircularProgress size={18} />
-                  <Typography sx={{ fontSize: 12, color: "#2563eb" }}>
+
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: "#2563eb",
+                    }}
+                  >
                     Đang tải câu hỏi tuần {selectedWeek}...
                   </Typography>
                 </Box>
               )}
 
-              {validQuestionCount === 0 && (
+              {!loadingQuestions && validQuestionCount === 0 && (
                 <Typography
                   sx={{
                     textAlign: "center",
@@ -613,15 +827,21 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     color: "#dc2626",
                   }}
                 >
-                  Chưa có câu hỏi hợp lệ. Hãy chọn Soạn đề để nhập câu hỏi.
+                  Chưa có câu hỏi hợp lệ. Hãy chọn Soạn đề để nhập
+                  câu hỏi.
                 </Typography>
               )}
             </Stack>
           )}
 
-          {/* MÀN HÌNH ĐANG THI */}
+          {/* =========================================
+              MÀN HÌNH LÀM BÀI
+          ========================================= */}
+
           {phase === "playing" && current && (
             <Stack spacing={{ xs: 1.5, sm: 2 }}>
+              {/* THỐNG KÊ */}
+
               <Box
                 sx={{
                   display: "grid",
@@ -655,7 +875,10 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   <Paper
                     key={item.label}
                     elevation={0}
-                    sx={{ ...paperSx, p: { xs: 1, sm: 1.3 } }}
+                    sx={{
+                      ...paperSx,
+                      p: { xs: 1, sm: 1.3 },
+                    }}
                   >
                     <Stack
                       direction="row"
@@ -677,6 +900,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                       >
                         {item.icon}
                       </Box>
+
                       <Box sx={{ minWidth: 0 }}>
                         <Typography
                           sx={{
@@ -687,6 +911,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                         >
                           {item.label}
                         </Typography>
+
                         <Typography
                           sx={{
                             fontSize: { xs: 15, sm: 18 },
@@ -703,6 +928,8 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 ))}
               </Box>
 
+              {/* TIẾN TRÌNH */}
+
               <Box>
                 <Stack
                   direction="row"
@@ -710,16 +937,26 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   sx={{ mb: 0.6 }}
                 >
                   <Typography
-                    sx={{ fontSize: 10, fontWeight: 800, color: "#64748b" }}
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#64748b",
+                    }}
                   >
                     TIẾN TRÌNH
                   </Typography>
+
                   <Typography
-                    sx={{ fontSize: 10, fontWeight: 900, color: "#2563eb" }}
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 900,
+                      color: "#2563eb",
+                    }}
                   >
                     {Math.round(progress)}%
                   </Typography>
                 </Stack>
+
                 <LinearProgress
                   variant="determinate"
                   value={progress}
@@ -727,6 +964,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     height: 7,
                     borderRadius: 5,
                     bgcolor: "#dbeafe",
+
                     "& .MuiLinearProgress-bar": {
                       borderRadius: 5,
                       background:
@@ -736,223 +974,156 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 />
               </Box>
 
+              {/* LOẠI CÂU HỎI */}
+
+              <Box>
+                <Chip
+                  size="small"
+                  label={getQuestionTypeLabel(current.type)}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11,
+                    color: "#1d4ed8",
+                    bgcolor: "#dbeafe",
+                  }}
+                />
+              </Box>
+
+              {/* NỘI DUNG VÀ GIAO DIỆN TRẢ LỜI */}
+
               <Paper
                 elevation={0}
                 sx={{
-                  p: { xs: 2, sm: 2.5 },
+                  p: { xs: 1.5, sm: 2 },
                   borderRadius: 3,
                   border: "1px solid #dbeafe",
-                  background:
-                    "linear-gradient(135deg,#eff6ff 0%,#f5f3ff 100%)",
-                  textAlign: "center",
+                  bgcolor: "#fff",
+                  minWidth: 0,
                 }}
               >
-                <Typography
-                  sx={{
-                    mb: 1,
-                    fontSize: 10,
-                    fontWeight: 900,
-                    letterSpacing: 1.2,
-                    color: "#2563eb",
-                  }}
-                >
-                  THỬ THÁCH KIẾN THỨC
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: { xs: 16, sm: 18 },
-                    fontWeight: 700,
-                    color: "#172554",
-                    lineHeight: 1.5,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {current.question}
-                </Typography>
+                <QuestionPlayer
+                  key={`${currentIndex}-${phase}`}
+                  question={current}
+                  answer={answer}
+                  onChange={setAnswer}
+                  onCheck={handleQuestionCheck}
+                  disabled={answered}
+                  showCheckButton={!answered}
+                />
               </Paper>
 
-              <Box>
-                <Typography
-                  sx={{
-                    mb: 1,
-                    fontSize: 10,
-                    fontWeight: 900,
-                    color: "#64748b",
-                  }}
-                >
-                  CHỌN MỘT ĐÁP ÁN
-                </Typography>
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(2,minmax(0,1fr))",
-                    },
-                    gap: 1,
-                  }}
-                >
-                  {current.options.map((option, index) => {
-                    const isCorrect = index === current.answerIndex;
-                    const isSelected = index === selectedAnswer;
-                    const isWrong = answered && isSelected && !isCorrect;
-                    const success = answered && isCorrect;
-
-                    return (
-                      <Button
-                        key={index}
-                        variant="outlined"
-                        disabled={answered}
-                        onClick={() => chooseAnswer(index)}
-                        sx={{
-                          minHeight: { xs: 56, sm: 66 },
-                          p: 1.2,
-                          justifyContent: "flex-start",
-                          textAlign: "left",
-                          whiteSpace: "normal",
-                          borderRadius: 2.5,
-                          borderWidth: 1.5,
-                          borderColor: success
-                            ? "#22c55e"
-                            : isWrong
-                            ? "#ef4444"
-                            : "#cbd5e1",
-                          bgcolor: success
-                            ? "#ecfdf5"
-                            : isWrong
-                            ? "#fef2f2"
-                            : "#fff",
-                          "&:hover": {
-                            borderWidth: 1.5,
-                            borderColor: "#2563eb",
-                            bgcolor: "#eff6ff",
-                          },
-                          "&.Mui-disabled": {
-                            opacity: 1,
-                            color: "#1e293b",
-                            borderColor: success
-                              ? "#22c55e"
-                              : isWrong
-                              ? "#ef4444"
-                              : "#cbd5e1",
-                            bgcolor: success
-                              ? "#ecfdf5"
-                              : isWrong
-                              ? "#fef2f2"
-                              : "#f8fafc",
-                          },
-                        }}
-                      >
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          spacing={1}
-                          sx={{ width: "100%" }}
-                        >
-                          <Box
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              flexShrink: 0,
-                              borderRadius: 2,
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 900,
-                              color: success || isWrong ? "#fff" : "#2563eb",
-                              bgcolor: success
-                                ? "#16a34a"
-                                : isWrong
-                                ? "#dc2626"
-                                : "#eff6ff",
-                            }}
-                          >
-                            {success ? (
-                              <CheckCircleRoundedIcon fontSize="small" />
-                            ) : isWrong ? (
-                              <CancelRoundedIcon fontSize="small" />
-                            ) : (
-                              OPTION_LABELS[index]
-                            )}
-                          </Box>
-                          <Typography
-                            sx={{
-                              flex: 1,
-                              minWidth: 0,
-                              fontSize: 16,
-                              fontWeight: 500,
-                              lineHeight: 1.45,
-                              textTransform: "none",
-                              overflowWrap: "anywhere",
-                            }}
-                          >
-                            {option}
-                          </Typography>
-                        </Stack>
-                      </Button>
-                    );
-                  })}
-                </Box>
-              </Box>
+              {/* KẾT QUẢ CÂU TRẢ LỜI 
 
               {answered && (
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 1.5,
-                    borderRadius: 2.5,
-                    bgcolor:
-                      selectedAnswer === current.answerIndex
+                <Fade in>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: 2.5,
+                      bgcolor: isCorrect
                         ? "#ecfdf5"
                         : "#fff7ed",
-                    border: "1px solid",
-                    borderColor:
-                      selectedAnswer === current.answerIndex
+                      border: "1px solid",
+                      borderColor: isCorrect
                         ? "#86efac"
                         : "#fdba74",
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    {selectedAnswer === current.answerIndex ? (
-                      <CheckCircleRoundedIcon sx={{ color: "#059669" }} />
-                    ) : (
-                      <CancelRoundedIcon sx={{ color: "#ea580c" }} />
-                    )}
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                    >
+                      {isCorrect ? (
+                        <CheckCircleRoundedIcon
+                          sx={{ color: "#059669" }}
+                        />
+                      ) : (
+                        <CancelRoundedIcon
+                          sx={{ color: "#ea580c" }}
+                        />
+                      )}
+
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 900,
+                          color: isCorrect
+                            ? "#047857"
+                            : "#c2410c",
+                        }}
+                      >
+                        {isCorrect
+                          ? "CHÍNH XÁC! +10 ĐIỂM"
+                          : timeOut
+                          ? "HẾT THỜI GIAN!"
+                          : "CHƯA CHÍNH XÁC!"}
+                      </Typography>
+                    </Stack>
+
+                    <Divider sx={{ my: 1 }} />
+
                     <Typography
                       sx={{
                         fontSize: 13,
-                        fontWeight: 900,
-                        color:
-                          selectedAnswer === current.answerIndex
-                            ? "#047857"
-                            : "#c2410c",
+                        color: "#475569",
+                        lineHeight: 1.7,
+                        overflowWrap: "anywhere",
                       }}
                     >
-                      {selectedAnswer === null
-                        ? "HẾT THỜI GIAN!"
-                        : selectedAnswer === current.answerIndex
-                        ? "CHÍNH XÁC! +10 ĐIỂM"
-                        : "CHƯA CHÍNH XÁC!"}
+                      <strong>Đáp án đúng:</strong>{" "}
+                      {correctAnswerText || "Vui lòng xem lại câu hỏi."}
                     </Typography>
-                  </Stack>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography
-                    sx={{ fontSize: 13, color: "#475569", lineHeight: 1.6 }}
-                  >
-                    Đáp án đúng:{" "}
-                    <strong>
-                      {OPTION_LABELS[current.answerIndex]}.{" "}
-                      {current.options[current.answerIndex]}
-                    </strong>
-                  </Typography>
-                </Paper>
-              )}
+
+                    {current.explanation && (
+                      <Box
+                        sx={{
+                          mt: 1,
+                          p: 1.2,
+                          borderRadius: 2,
+                          bgcolor: "rgba(255,255,255,.7)",
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: "#1e40af",
+                            mb: 0.4,
+                          }}
+                        >
+                          GIẢI THÍCH
+                        </Typography>
+
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            color: "#475569",
+                            lineHeight: 1.7,
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {current.explanation}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Paper>
+                </Fade>
+              )}*/}
             </Stack>
           )}
 
-          {/* MÀN HÌNH KẾT QUẢ */}
+          {/* =========================================
+              MÀN HÌNH KẾT QUẢ
+          ========================================= */}
+
           {phase === "result" && (
-            <Stack spacing={2} alignItems="center" sx={{ py: 1 }}>
+            <Stack
+              spacing={2}
+              alignItems="center"
+              sx={{ py: 1 }}
+            >
               <Box
                 sx={{
                   width: 76,
@@ -978,7 +1149,14 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 >
                   HOÀN THÀNH CUỘC THI!
                 </Typography>
-                <Typography sx={{ mt: 0.5, fontSize: 11, color: "#64748b" }}>
+
+                <Typography
+                  sx={{
+                    mt: 0.5,
+                    fontSize: 11,
+                    color: "#64748b",
+                  }}
+                >
                   Bạn đã chinh phục toàn bộ thử thách kiến thức.
                 </Typography>
               </Box>
@@ -1037,33 +1215,65 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     gap: 1,
                   }}
                 >
-                  <Box sx={{ p: 1.3, borderRadius: 2, bgcolor: "#ecfdf5" }}>
+                  <Box
+                    sx={{
+                      p: 1.3,
+                      borderRadius: 2,
+                      bgcolor: "#ecfdf5",
+                    }}
+                  >
                     <Typography
-                      sx={{ fontSize: 25, fontWeight: 900, color: "#059669" }}
+                      sx={{
+                        fontSize: 25,
+                        fontWeight: 900,
+                        color: "#059669",
+                      }}
                     >
                       {correctCount}
                     </Typography>
+
                     <Typography
-                      sx={{ fontSize: 10, fontWeight: 800, color: "#047857" }}
+                      sx={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#047857",
+                      }}
                     >
                       CÂU ĐÚNG
                     </Typography>
                   </Box>
 
-                  <Box sx={{ p: 1.3, borderRadius: 2, bgcolor: "#fef2f2" }}>
+                  <Box
+                    sx={{
+                      p: 1.3,
+                      borderRadius: 2,
+                      bgcolor: "#fef2f2",
+                    }}
+                  >
                     <Typography
-                      sx={{ fontSize: 25, fontWeight: 900, color: "#dc2626" }}
+                      sx={{
+                        fontSize: 25,
+                        fontWeight: 900,
+                        color: "#dc2626",
+                      }}
                     >
                       {questions.length - correctCount}
                     </Typography>
+
                     <Typography
-                      sx={{ fontSize: 10, fontWeight: 800, color: "#b91c1c" }}
+                      sx={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#b91c1c",
+                      }}
                     >
                       CÂU CHƯA ĐÚNG
                     </Typography>
                   </Box>
                 </Box>
               </Paper>
+
+              {/* TỈ LỆ ĐÚNG */}
 
               <Box sx={{ width: "100%" }}>
                 <Stack
@@ -1072,15 +1282,26 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                   sx={{ mb: 0.7 }}
                 >
                   <Typography
-                    sx={{ fontSize: 10, fontWeight: 800, color: "#64748b" }}
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#64748b",
+                    }}
                   >
                     TỈ LỆ TRẢ LỜI ĐÚNG
                   </Typography>
+
                   <Typography
-                    sx={{ fontSize: 11, fontWeight: 900, color: "#059669" }}
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: "#059669",
+                    }}
                   >
                     {questions.length
-                      ? Math.round((correctCount / questions.length) * 100)
+                      ? Math.round(
+                          (correctCount / questions.length) * 100
+                        )
                       : 0}
                     %
                   </Typography>
@@ -1097,6 +1318,7 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                     height: 9,
                     borderRadius: 5,
                     bgcolor: "#dcfce7",
+
                     "& .MuiLinearProgress-bar": {
                       borderRadius: 5,
                       bgcolor: "#10b981",
@@ -1106,20 +1328,12 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
               </Box>
             </Stack>
           )}
-
-          <Typography
-            sx={{
-              textAlign: "center",
-              color: "#94a3b8",
-              fontSize: 9,
-              mt: 2,
-            }}
-          >
-            HỆ THỐNG HỖ TRỢ GIÁO VIÊN · BÌNH KHÁNH
-          </Typography>
         </DialogContent>
 
-        {/* FOOTER CỐ ĐỊNH – KHÔNG CUỘN */}
+        {/* =========================================
+            FOOTER CỐ ĐỊNH
+        ========================================= */}
+
         <DialogActions
           sx={{
             px: { xs: 1.5, sm: 2.5 },
@@ -1130,11 +1344,16 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
             justifyContent: "center",
           }}
         >
+          {/* FOOTER MÀN HÌNH CHỜ */}
+
           {phase === "setup" && (
             <Stack
               direction="row"
               spacing={1}
-              sx={{ width: "100%", justifyContent: "center" }}
+              sx={{
+                width: "100%",
+                justifyContent: "center",
+              }}
             >
               <Button
                 onClick={handleClose}
@@ -1155,19 +1374,31 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 variant="contained"
                 startIcon={<PlayArrowRoundedIcon />}
                 onClick={startGame}
-                disabled={validQuestionCount === 0 || loadingQuestions}
-                sx={{ ...primaryButtonSx, minWidth: 150, py: 1 }}
+                disabled={
+                  validQuestionCount === 0 ||
+                  loadingQuestions
+                }
+                sx={{
+                  ...primaryButtonSx,
+                  minWidth: 150,
+                  py: 1,
+                }}
               >
                 BẮT ĐẦU
               </Button>
             </Stack>
           )}
 
+          {/* FOOTER ĐANG LÀM BÀI */}
+
           {phase === "playing" && (
             <Stack
               direction="row"
               spacing={1}
-              sx={{ width: "100%", justifyContent: "center" }}
+              sx={{
+                width: "100%",
+                justifyContent: "center",
+              }}
             >
               <Button
                 onClick={handleClose}
@@ -1189,7 +1420,11 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 variant="contained"
                 disabled={!answered}
                 onClick={nextQuestion}
-                sx={{ ...primaryButtonSx, maxWidth: 320, py: 1 }}
+                sx={{
+                  ...primaryButtonSx,
+                  maxWidth: 320,
+                  py: 1,
+                }}
               >
                 {currentIndex === questions.length - 1
                   ? "HOÀN THÀNH CUỘC THI"
@@ -1198,11 +1433,16 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
             </Stack>
           )}
 
+          {/* FOOTER KẾT QUẢ */}
+
           {phase === "result" && (
             <Stack
               direction="row"
               spacing={1}
-              sx={{ width: "100%", justifyContent: "center" }}
+              sx={{
+                width: "100%",
+                justifyContent: "center",
+              }}
             >
               <Button
                 onClick={handleClose}
@@ -1223,7 +1463,11 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
                 variant="contained"
                 startIcon={<RestartAltRoundedIcon />}
                 onClick={restartGame}
-                sx={{ ...primaryButtonSx, minWidth: 180, py: 1 }}
+                sx={{
+                  ...primaryButtonSx,
+                  minWidth: 180,
+                  py: 1,
+                }}
               >
                 CHƠI LẠI
               </Button>
@@ -1232,13 +1476,16 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
         </DialogActions>
       </Dialog>
 
-      {/* CÁC DIALOG CHỨC NĂNG ĐỘC LẬP */}
+      {/* DIALOG CẤU HÌNH */}
+
       <ArenaConfigDialog
         open={configOpen}
         onClose={() => setConfigOpen(false)}
         duration={duration}
         setDuration={setDuration}
       />
+
+      {/* DIALOG SOẠN ĐỀ */}
 
       <QuestionEditorDialog
         open={editorOpen}
