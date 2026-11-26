@@ -778,13 +778,29 @@ return (
       open={open}
       onClose={onClose}
       fullWidth
-      maxWidth="md"
+      maxWidth={false}
+      sx={{
+        "& .MuiDialog-container": {
+          alignItems: "center",
+        },
+        "& .MuiDialog-paper": {
+          margin: { xs: "8px", sm: "32px" },
+        },
+      }}
       TransitionComponent={Fade}
       PaperProps={{
         sx: {
-          borderRadius: 3,
+          width: {
+            xs: "calc(100vw - 16px)",
+            sm: "calc(100% - 64px)",
+          },
+          maxWidth: {
+            xs: "calc(100vw - 16px)",
+            sm: "900px",
+          },
+          borderRadius: { xs: 4, sm: 3 },
           overflow: "hidden",
-          maxHeight: "94vh",
+          maxHeight: { xs: "96%", sm: "94vh" },
         },
       }}
     >

@@ -505,15 +505,29 @@ export default function QuestionFormDialog({
         open={open}
         onClose={onClose}
         fullWidth
-        maxWidth="md"
+        maxWidth={false}
+        sx={{
+          "& .MuiDialog-container": {
+            alignItems: "center",
+          },
+          "& .MuiDialog-paper": {
+            margin: { xs: "8px", sm: "32px" },
+          },
+        }}
         TransitionComponent={Fade}
         PaperProps={{
           sx: {
-            width: "100%",
-            maxWidth: 900,
-            height: "94dvh",
-            maxHeight: "94dvh",
-            borderRadius: 4,
+            width: {
+              xs: "calc(100vw - 16px)",
+              sm: "calc(100% - 64px)",
+            },
+            maxWidth: {
+              xs: "calc(100vw - 16px)",
+              sm: "900px",
+            },
+            height: { xs: "96%", sm: "94dvh" },
+            maxHeight: { xs: "96%", sm: "94dvh" },
+            borderRadius: { xs: 4, sm: 4 },
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",

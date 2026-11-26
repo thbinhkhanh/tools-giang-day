@@ -610,18 +610,32 @@ useEffect(() => {
         open={open}
         onClose={saving ? undefined : onClose}
         fullWidth
-        maxWidth="md"
+        maxWidth={false}
+        sx={{
+          "& .MuiDialog-container": {
+            alignItems: "center",
+          },
+          "& .MuiDialog-paper": {
+            margin: { xs: "8px", sm: "32px" },
+          },
+        }}
         TransitionComponent={Fade}
         PaperProps={{
           sx: {
-            width: "100%",
-            maxWidth: 900,
-            height: "94dvh",
-            maxHeight: "94dvh",
+            width: {
+              xs: "calc(100vw - 16px)",
+              sm: "calc(100% - 64px)",
+            },
+            maxWidth: {
+              xs: "calc(100vw - 16px)",
+              sm: "900px",
+            },
+            height: { xs: "96%", sm: "94dvh" },
+            maxHeight: { xs: "96%", sm: "94dvh" },
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            borderRadius: 4,
+            borderRadius: { xs: 4, sm: 4 },
             bgcolor: "#fff",
             boxShadow: "0 25px 80px rgba(15,23,42,.25)",
           },
