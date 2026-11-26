@@ -18,14 +18,14 @@ export default function QuestionTypeSelector({
 }) {
   return (
     <Box>
-      <Typography
+      {/*<Typography
         fontSize={13}
         fontWeight={800}
         color="#475569"
         mb={0.8}
       >
         DẠNG CÂU HỎI
-      </Typography>
+      </Typography>*/}
 
       <TextField
         select

@@ -9,11 +9,11 @@ export const QUESTION_TYPES = {
 };
 
 export const QUESTION_TYPE_OPTIONS = [
-  { value: "single", label: "Trắc nghiệm một đáp án" },
-  { value: "multiple", label: "Trắc nghiệm nhiều đáp án" },
-  { value: "true_false", label: "Đúng / Sai" },
-  { value: "ordering", label: "Sắp xếp thứ tự" },
-  { value: "fill_blank", label: "Điền từ hoặc đáp án" },
+  { value: "single", label: "Chọn 1 đáp án" },
+  { value: "multiple", label: "Chọn nhiều đáp án" },
+  { value: "true_false", label: "Đúng – Sai" },
+  { value: "ordering", label: "Sắp xếp" },
+  { value: "fill_blank", label: "Điền khuyết" },
   { value: "matching", label: "Nối cặp" },
 ];
 

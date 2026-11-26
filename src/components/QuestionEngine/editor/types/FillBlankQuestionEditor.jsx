@@ -31,10 +31,6 @@ export default function FillBlankQuestionEditor({ question, onChange }) {
         }
         helperText="Mỗi dòng là một cách trả lời đúng. Không phân biệt chữ hoa và chữ thường."
       />
-
-      <Alert severity="info" sx={{ mt: 1.5 }}>
-        Học sinh chỉ cần nhập một trong các đáp án được chấp nhận.
-      </Alert>
     </Box>
   );
 }

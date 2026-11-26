@@ -781,35 +781,6 @@ export default function QuestionEditorDialog({
                 p: { xs: 1.5, sm: 2 },
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 1.5 }}
-              >
-                <Box>
-                  <Typography
-                    sx={{
-                      fontSize: 16,
-                      fontWeight: 900,
-                      color: "#172554",
-                    }}
-                  >
-                    CÂU HỎI ĐẤU TRƯỜNG KIẾN THỨC
-                  </Typography>
-
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      color: "#64748b",
-                      mt: 0.3,
-                    }}
-                  >
-                    Hỗ trợ 6 dạng câu hỏi.
-                  </Typography>
-                </Box>
-              </Stack>
-
               {loadingExam ? (
                 <Box
                   sx={{

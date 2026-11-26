@@ -3,11 +3,9 @@ import React from "react";
 import {
   Box,
   TextField,
-  Typography,
-  Button,
-  Alert,
+  Checkbox,
+  Tooltip,
 } from "@mui/material";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 
 export default function SingleQuestionEditor({ question, onChange }) {
   const updateOption = (index, value) => {
@@ -18,10 +16,6 @@ export default function SingleQuestionEditor({ question, onChange }) {
 
   return (
     <Box>
-      <Typography fontWeight={900} fontSize={14} mb={1}>
-        CÁC PHƯƠNG ÁN – CHỌN MỘT ĐÁP ÁN ĐÚNG
-      </Typography>
-
       {question.options.map((option, index) => {
         const selected = question.correctIndex === index;
 
@@ -41,32 +35,59 @@ export default function SingleQuestionEditor({ question, onChange }) {
               onChange={(e) => updateOption(index, e.target.value)}
             />
 
-            <Button
-              variant={selected ? "contained" : "outlined"}
-              color={selected ? "success" : "primary"}
-              onClick={() =>
-                onChange({ ...question, correctIndex: index })
+            <Tooltip
+              title={
+                selected
+                  ? "Đáp án đúng"
+                  : "Chọn làm đáp án đúng"
               }
-              sx={{
-                minWidth: 82,
-                minHeight: 40,
-                borderRadius: 2,
-                fontWeight: 800,
-              }}
             >
-              {selected ? (
-                <CheckCircleRoundedIcon />
-              ) : (
-                "Đáp án"
-              )}
-            </Button>
+              <Checkbox
+                checked={selected}
+                onChange={() =>
+                  onChange({
+                    ...question,
+                    correctIndex: index,
+                  })
+                }
+                icon={
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      border: "2px solid #94a3b8",
+                      borderRadius: 1,
+                      bgcolor: "#fff",
+                    }}
+                  />
+                }
+                checkedIcon={
+                  <Box
+                    sx={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 1,
+                      bgcolor: "#16a34a",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 17,
+                      fontWeight: 900,
+                    }}
+                  >
+                    ✓
+                  </Box>
+                }
+                sx={{
+                  p: 0.8,
+                  flexShrink: 0,
+                }}
+              />
+            </Tooltip>
           </Box>
         );
       })}
-
-      <Alert severity="info" sx={{ mt: 1 }}>
-        Học sinh chỉ được chọn một phương án.
-      </Alert>
     </Box>
   );
 }

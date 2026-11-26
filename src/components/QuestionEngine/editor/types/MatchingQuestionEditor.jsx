@@ -40,10 +40,6 @@ export default function MatchingQuestionEditor({ question, onChange }) {
 
   return (
     <Box>
-      <Typography fontWeight={900} fontSize={14} mb={1}>
-        CÁC CẶP NỘI DUNG CẦN NỐI
-      </Typography>
-
       <Typography fontSize={12} color="text.secondary" mb={1.5}>
         Nhập hai nội dung tương ứng. Học sinh sẽ nối vế trái với vế phải.
       </Typography>
@@ -97,11 +93,6 @@ export default function MatchingQuestionEditor({ question, onChange }) {
       >
         Thêm cặp
       </Button>
-
-      <Alert severity="info" sx={{ mt: 1.5 }}>
-        Các cặp được nhập ở đây là đáp án đúng. Khi làm bài, thứ tự vế phải
-        sẽ được xáo trộn.
-      </Alert>
     </Box>
   );
 }

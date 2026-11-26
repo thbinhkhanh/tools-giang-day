@@ -7,11 +7,11 @@ import {
   Typography,
   TextField,
   Button,
-  IconButton,
   Chip,
   Divider,
   Alert,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -124,13 +124,13 @@ export default function QuestionEditor({
     if (draftQuestions.length >= maxQuestions) return;
 
     const nextQuestions = [
-        ...draftQuestions,
-        createEmptyQuestion(),
+      ...draftQuestions,
+      createEmptyQuestion(),
     ];
 
     updateQuestions(nextQuestions);
     setCurrentIndex(nextQuestions.length - 1);
-    };
+  };
 
   // Xóa câu hỏi
   const handleDeleteQuestion = () => {
@@ -211,14 +211,14 @@ export default function QuestionEditor({
 
           {!readOnly && (
             <Button
-                size="small"
-                variant="contained"
-                startIcon={<AddRoundedIcon />}
-                disabled={draftQuestions.length >= maxQuestions}
-                onClick={handleAddQuestion}
-                sx={{ borderRadius: 2, fontWeight: 800 }}
-                >
-                Thêm câu
+              size="small"
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              disabled={draftQuestions.length >= maxQuestions}
+              onClick={handleAddQuestion}
+              sx={{ borderRadius: 2, fontWeight: 800 }}
+            >
+              Thêm câu
             </Button>
           )}
         </Box>
@@ -259,28 +259,64 @@ export default function QuestionEditor({
           bgcolor: "#fff",
         }}
       >
-        {/* TIÊU ĐỀ CÂU */}
+        {/* CÂU HỎI + DẠNG CÂU HỎI + NÚT CHỨC NĂNG */}
         <Box
           display="flex"
           alignItems="center"
-          justifyContent="space-between"
+          flexWrap="nowrap"
           gap={1}
           mb={2}
+          sx={{
+            minWidth: 0,
+            "@media (max-width: 600px)": {
+              flexWrap: "wrap",
+            },
+          }}
         >
+          {/* SỐ THỨ TỰ CÂU HỎI */}
           <Typography
             fontSize={16}
             fontWeight={900}
             color="#1d4ed8"
+            whiteSpace="nowrap"
+            sx={{ flexShrink: 0 }}
           >
             CÂU HỎI {currentIndex + 1}
           </Typography>
 
+          {/* Ô CHỌN DẠNG CÂU HỎI
+              QuestionTypeSelector đã có nhãn riêng */}
+          <Box
+  sx={{
+    flex: "0 1 auto",
+    width: "fit-content",
+    minWidth: 150,
+    maxWidth: "100%",
+  }}
+>
+  <QuestionTypeSelector
+    value={currentQuestion.type}
+    onChange={handleChangeType}
+    disabled={readOnly}
+  />
+</Box>
+
+          {/* NÚT CHỨC NĂNG */}
           {!readOnly && (
-            <Box display="flex" gap={0.5}>
+            <Box
+              display="flex"
+              alignItems="center"
+              gap={0.5}
+              sx={{
+                ml: "auto",
+                flexShrink: 0,
+              }}
+            >
               <Tooltip title="Xem trước giao diện học sinh">
                 <IconButton
                   color="primary"
                   onClick={() => setPreviewOpen(true)}
+                  size="small"
                 >
                   <VisibilityRoundedIcon />
                 </IconButton>
@@ -292,6 +328,7 @@ export default function QuestionEditor({
                     color="error"
                     disabled={draftQuestions.length <= minQuestions}
                     onClick={handleDeleteQuestion}
+                    size="small"
                   >
                     <DeleteOutlineRoundedIcon />
                   </IconButton>
@@ -301,14 +338,7 @@ export default function QuestionEditor({
           )}
         </Box>
 
-        {/* DẠNG CÂU HỎI */}
-        <QuestionTypeSelector
-          value={currentQuestion.type}
-          onChange={handleChangeType}
-          disabled={readOnly}
-        />
-
-        {/* NỘI DUNG */}
+        {/* NỘI DUNG CÂU HỎI */}
         <TextField
           fullWidth
           multiline
@@ -324,7 +354,7 @@ export default function QuestionEditor({
             })
           }
           sx={{
-            mt: 2,
+            mt: 1,
             mb: 2.5,
             "& .MuiOutlinedInput-root": {
               borderRadius: 2,

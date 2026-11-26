@@ -54,10 +54,6 @@ export default function OrderingQuestionEditor({ question, onChange }) {
 
   return (
     <Box>
-      <Typography fontWeight={900} fontSize={14} mb={1}>
-        CÁC NỘI DUNG CẦN SẮP XẾP
-      </Typography>
-
       <Typography fontSize={12} color="text.secondary" mb={1.5}>
         Nhập từng nội dung, sau đó chọn thứ tự đúng từ 1 đến số mục đã nhập.
       </Typography>
@@ -101,11 +97,6 @@ export default function OrderingQuestionEditor({ question, onChange }) {
           </Box>
         );
       })}
-
-      <Alert severity="info" sx={{ mt: 1 }}>
-        Thứ tự được lưu theo chỉ số các nội dung, không phụ thuộc vị trí
-        hiển thị của phương án.
-      </Alert>
     </Box>
   );
 }
