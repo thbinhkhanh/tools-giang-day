@@ -1861,11 +1861,39 @@ return (
           <Typography
             sx={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#64748b",
               fontWeight: 600,
             }}
           >
             CÔNG CỤ HỖ TRỢ GIẢNG DẠY · DẠY HỌC SÁNG TẠO VÀ HIỆU QUẢ
+          </Typography>
+
+          <Typography
+            sx={{
+              mt: 0.7,
+              fontSize: 11,
+              color: "#94a3b8",
+            }}
+          >
+            © 2026 · Bản quyền thuộc về tác giả
+          </Typography>
+
+          <Typography
+            component="a"
+            href="mailto:thbinhkhanh@gmail.com"
+            sx={{
+              display: "inline-block",
+              mt: 0.4,
+              fontSize: 11,
+              color: "#2563eb",
+              textDecoration: "none",
+              fontWeight: 600,
+              "&:hover": {
+                textDecoration: "underline",
+              },
+            }}
+          >
+            Liên hệ: thbinhkhanh@gmail.com
           </Typography>
         </Box>
       </Paper>

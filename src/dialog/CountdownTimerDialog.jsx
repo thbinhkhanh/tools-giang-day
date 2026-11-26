@@ -346,7 +346,10 @@ return (
     fullWidth
     PaperProps={{
       sx: {
-        borderRadius: 4,
+        width: { xs: "calc(100% - 8px)", sm: "100%" },
+        maxWidth: { xs: "none", sm: "444px" },
+        m: { xs: "4px", sm: 3 },
+        borderRadius: { xs: 4, sm: 4 },
         overflow: "hidden",
         background: "#ffffff",
         boxShadow: "none",

@@ -118,7 +118,10 @@ export default function DiceDialog({ open, onClose }) {
     fullWidth
     PaperProps={{
       sx: {
-        borderRadius: 4,
+        width: { xs: "calc(100% - 8px)", sm: "100%" },
+        maxWidth: { xs: "none", sm: "444px" },
+        m: { xs: "4px", sm: 3 },
+        borderRadius: { xs: 4, sm: 4 },
         overflow: "hidden",
         background: "#FFFFFF",
         boxShadow: "0 20px 60px rgba(15,23,42,.16)",

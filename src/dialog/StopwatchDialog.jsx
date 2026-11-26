@@ -137,13 +137,13 @@ export default function StopwatchDialog({ open, onClose }) {
     fullWidth
     PaperProps={{
       sx: {
-        width: "100%",
-        maxWidth: "444px",
-        borderRadius: 4,
+        width: { xs: "calc(100% - 8px)", sm: "100%" },
+        maxWidth: { xs: "none", sm: "444px" },
+        borderRadius: { xs: 4, sm: 4 },
         overflow: "hidden",
         background: "#ffffff",
         boxShadow: "none",
-        m: { xs: 2, sm: 3 },
+        m: { xs: "4px", sm: 3 },
       },
     }}
   >

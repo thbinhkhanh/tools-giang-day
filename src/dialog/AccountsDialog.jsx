@@ -526,8 +526,9 @@ return (
               sx={{
                 flex: 1,
                 minHeight: 0,
+                overflowX: "auto",
                 overflowY: "auto",
-                overflowX: "hidden",
+                WebkitOverflowScrolling: "touch",
                 border: "1px solid #e2e8f0",
                 borderRadius: 2,
                 "&::-webkit-scrollbar": {
@@ -543,13 +544,13 @@ return (
                 size="small"
                 stickyHeader
                 sx={{
-                  width: "100%",
-                  tableLayout: "fixed",
+                  minWidth: { xs: 900, sm: 1100 },
+                  width: "max-content",
+                  tableLayout: "auto",
                   "& td, & th": {
-                    px: { xs: 0.5, sm: 0.8 },
+                    px: { xs: 1, sm: 1.2 },
                     py: 1.5,
-                    overflowWrap: "anywhere",
-                    wordBreak: "break-word",
+                    whiteSpace: "nowrap",
                   },
                 }}
               >
