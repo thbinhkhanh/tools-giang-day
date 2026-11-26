@@ -28,7 +28,11 @@ import UpdateProfileDialog from "./dialog/UpdateProfileDialog";
 
 import { StudentProvider } from "./context/StudentContext";
 
+import QuestionEngineTest from "./components/QuestionEngine/QuestionEngineTest";
+
 export default function App() {
+
+  //return <QuestionEngineTest />;
   // =====================================================
   // STATE
   // =====================================================

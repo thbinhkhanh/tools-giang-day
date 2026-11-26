@@ -28,6 +28,11 @@ import TreasureMapIllustration from "../components/TreasureMapIllustration";
 import TreasureMapConfigDialog from "../dialog/TreasureMapConfigDialog";
 import SettingsIcon from "@mui/icons-material/Settings";
 
+import {
+  QuestionPlayer,
+  createEmptyAnswer,
+} from "../components/QuestionEngine";
+
 const MAP_THEMES = {
   tropical: {
     id: "tropical",
@@ -228,9 +233,28 @@ function buildStages(themeId, count, questions = []) {
           ? "Chặng cuối cùng! Hoàn thành để mở rương kho báu."
           : "Hoàn thành thử thách tại địa danh này để tiến bước tiếp.",
 
+      // Dữ liệu câu hỏi
+      type: quiz?.type || "single",
       question: quiz?.question || "",
       options: quiz?.options || [],
+
+      // Trắc nghiệm một đáp án
       correctIndex: quiz?.correctIndex ?? -1,
+
+      // Trắc nghiệm nhiều đáp án
+      correctIndexes: quiz?.correctIndexes || [],
+
+      // Câu hỏi đúng / sai
+      correctAnswer: quiz?.correctAnswer ?? null,
+
+      // Câu hỏi sắp xếp thứ tự
+      correctOrder: quiz?.correctOrder || [],
+
+      // Câu hỏi điền khuyết
+      acceptedAnswers: quiz?.acceptedAnswers || [],
+
+      // Câu hỏi nối cặp
+      pairs: quiz?.pairs || [],
 
       reward,
     };
@@ -380,6 +404,7 @@ useEffect(() => {
   const [completed, setCompleted] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [wrongChoice, setWrongChoice] = useState(null);
+  const [currentAnswer, setCurrentAnswer] = useState(null);
   const [rewards, setRewards] = useState([]);
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -572,6 +597,7 @@ useEffect(() => {
     setCompleted(false);
     setFeedback(null);
     setWrongChoice(null);
+    setCurrentAnswer(null);
     setRewards([]);
     setEditingTitle(false);
     setInspectedStage(null);
@@ -678,35 +704,110 @@ useEffect(() => {
             : 0,
         });
 
-        // Đọc và kiểm tra câu hỏi
+        // Đọc và chuẩn hóa các dạng câu hỏi
         const questions = Array.isArray(data.questions)
           ? data.questions
               .map((item) => ({
+                // Mặc định câu hỏi cũ là trắc nghiệm một đáp án
+                type: item.type || "single",
+
                 question: String(item.question || "").trim(),
 
                 options: Array.isArray(item.options)
-                  ? item.options.map((option) =>
-                      String(option)
+                  ? item.options.map((option) => String(option))
+                  : [],
+
+                // Trắc nghiệm một đáp án
+                correctIndex:
+                  item.correctIndex !== undefined
+                    ? Number(item.correctIndex)
+                    : -1,
+
+                // Trắc nghiệm nhiều đáp án
+                correctIndexes: Array.isArray(item.correctIndexes)
+                  ? item.correctIndexes.map(Number)
+                  : [],
+
+                // Đúng / sai
+                correctAnswer: item.correctAnswer ?? null,
+
+                // Sắp xếp thứ tự
+                correctOrder: Array.isArray(item.correctOrder)
+                  ? item.correctOrder.map(Number)
+                  : [],
+
+                // Điền khuyết
+                acceptedAnswers: Array.isArray(item.acceptedAnswers)
+                  ? item.acceptedAnswers.map((answer) =>
+                      String(answer).trim()
                     )
                   : [],
 
-                correctIndex: Number(item.correctIndex),
+                // Nối cặp
+                pairs: Array.isArray(item.pairs)
+                  ? item.pairs.map((pair) => ({
+                      left: String(pair.left || "").trim(),
+                      right: String(pair.right || "").trim(),
+                    }))
+                  : [],
               }))
-              .filter(
-                (item) =>
-                  item.question &&
-                  item.options.length >= 2 &&
-                  Number.isInteger(item.correctIndex) &&
-                  item.correctIndex >= 0 &&
-                  item.correctIndex < item.options.length
-              )
-          : [];
+              .filter((item) => {
+                if (!item.question) return false;
 
-        if (questions.length === 0) {
-          throw new Error(
-            "Không có câu hỏi hợp lệ trong document GAME."
-          );
-        }
+                switch (item.type) {
+                  case "single":
+                    return (
+                      item.options.length >= 2 &&
+                      Number.isInteger(item.correctIndex) &&
+                      item.correctIndex >= 0 &&
+                      item.correctIndex < item.options.length
+                    );
+
+                  case "multiple":
+                    return (
+                      item.options.length >= 2 &&
+                      item.correctIndexes.length > 0 &&
+                      item.correctIndexes.every(
+                        (index) =>
+                          Number.isInteger(index) &&
+                          index >= 0 &&
+                          index < item.options.length
+                      )
+                    );
+
+                  case "true_false":
+                    return typeof item.correctAnswer === "boolean";
+
+                  case "ordering":
+                    return (
+                      item.options.length >= 2 &&
+                      item.correctOrder.length === item.options.length &&
+                      item.correctOrder.every(
+                        (index) =>
+                          Number.isInteger(index) &&
+                          index >= 0 &&
+                          index < item.options.length
+                      )
+                    );
+
+                  case "fill_blank":
+                    return item.acceptedAnswers.some(
+                      (answer) => answer.length > 0
+                    );
+
+                  case "matching":
+                    return (
+                      item.pairs.length >= 2 &&
+                      item.pairs.every(
+                        (pair) => pair.left && pair.right
+                      )
+                    );
+
+                  default:
+                    return false;
+                }
+              })
+          : [];
 
         if (cancelled) return;
 
@@ -832,12 +933,14 @@ useEffect(() => {
       setStepIndex(nextIdx);
       setFeedback(null);
       setWrongChoice(null);
+      setCurrentAnswer(null);
       setEditingTitle(false);
       setDraftTitle(stages[nextIdx].activityTitle);
     } else {
       setCompleted(true);
       setFeedback(null);
       setWrongChoice(null);
+      setCurrentAnswer(null);
       playVictorySound();
     }
   };
@@ -847,12 +950,11 @@ useEffect(() => {
     advanceOrFinish();
   };
 
-  const handleSelectQuizOption = (optIdx) => {
+  const handleCheckQuizAnswer = ({ isCorrect }) => {
     if (feedback === "correct" || completed) return;
 
-    if (optIdx === currentStage.correctIndex) {
+    if (isCorrect) {
       playStepSound();
-
       setFeedback("correct");
       setWrongChoice(null);
 
@@ -865,9 +967,7 @@ useEffect(() => {
       );
     } else {
       playWrongSound();
-
       setFeedback("wrong");
-      setWrongChoice(optIdx);
     }
   };
 
@@ -1584,7 +1684,7 @@ return (
                   : "Mở rương kho báu"}
               </Button>
             </Paper>
-          ) : (
+          ) : (            
             <Paper
               elevation={0}
               sx={{
@@ -1643,91 +1743,16 @@ return (
                     {currentStage.clue}
                   </Typography>
 
-                  <Typography
-                    sx={{
-                      mt: 1.25,
-                      fontSize: 17,
-                      fontWeight: 900,
-                      color: "#0f172a",
-                    }}
-                  >
-                    {currentStage.question}
-                  </Typography>
-
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 1,
-                      mt: 1.5,
-                    }}
-                  >
-                    {currentStage.options.map((opt, idx) => {
-                      const isCorrectOpt =
-                        feedback === "correct" &&
-                        idx === currentStage.correctIndex;
-
-                      const isWrongOpt =
-                        feedback === "wrong" &&
-                        idx === wrongChoice;
-
-                      return (
-                        <Button
-                          key={`${idx}-${opt}`}
-                          fullWidth
-                          variant="outlined"
-                          disabled={feedback === "correct"}
-                          onClick={() =>
-                            handleSelectQuizOption(idx)
-                          }
-                          sx={{
-                            justifyContent: "flex-start",
-                            textAlign: "left",
-                            py: 1.3,
-                            px: 2,
-                            borderRadius: 2.5,
-                            textTransform: "none",
-                            fontWeight: 700,
-                            fontSize: 14,
-                            bgcolor: isCorrectOpt
-                              ? "#dcfce7"
-                              : isWrongOpt
-                                ? "#fee2e2"
-                                : "#fff",
-                            borderColor: isCorrectOpt
-                              ? "#22c55e"
-                              : isWrongOpt
-                                ? "#ef4444"
-                                : "#cbd5e1",
-                            color: isCorrectOpt
-                              ? "#166534"
-                              : isWrongOpt
-                                ? "#991b1b"
-                                : "#0f172a",
-                          }}
-                        >
-                          {String.fromCharCode(65 + idx)}. {opt}
-                        </Button>
-                      );
-                    })}
-                  </Box>
-
-                  {feedback === "wrong" && (
-                    <Typography
-                      sx={{
-                        mt: 1.25,
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color: "#dc2626",
-                      }}
-                    >
-                      Chưa chính xác! Hãy thử chọn lại đáp án
-                      khác nhé.
-                    </Typography>
-                  )}
+                  <QuestionPlayer
+                    key={`${stepIndex}-${currentStage.id}`}
+                    question={currentStage}
+                    answer={currentAnswer}
+                    onChange={setCurrentAnswer}
+                    onCheck={handleCheckQuizAnswer}
+                  />
 
                   {feedback === "correct" && (
-                    <Box sx={{ mt: 1.5 }}>
+                    <Box sx={{ mt: 2 }}>
                       <Typography
                         sx={{
                           fontSize: 13.5,
@@ -1735,8 +1760,7 @@ return (
                           color: "#15803d",
                         }}
                       >
-                        ✨ Chính xác! Bạn nhận được:{" "}
-                        {currentStage.reward}
+                        🎁 Phần thưởng: {currentStage.reward}
                       </Typography>
 
                       <Button
@@ -1762,6 +1786,7 @@ return (
                 </>
               ) : null}
             </Paper>
+
           )}
         </Box>
       </DialogContent>
@@ -1774,9 +1799,15 @@ return (
       stageCount={stageCount}
       mode={mode}
       questions={stages.map((stage) => ({
+        type: stage.type || "single",
         question: stage.question || "",
-        options: stage.options || ["", "", "", ""],
-        correctIndex: stage.correctIndex ?? 0,
+        options: stage.options || [],
+        correctIndex: stage.correctIndex ?? -1,
+        correctIndexes: stage.correctIndexes || [],
+        correctAnswer: stage.correctAnswer ?? null,
+        correctOrder: stage.correctOrder || [],
+        acceptedAnswers: stage.acceptedAnswers || [],
+        pairs: stage.pairs || [],
       }))}
       onApply={handleApplyConfig}
     />

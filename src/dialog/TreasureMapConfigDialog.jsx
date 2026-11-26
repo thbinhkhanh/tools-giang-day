@@ -40,6 +40,14 @@ import ThemePreviewDialog from "../dialog/ThemePreviewDialog";
 import QuestionBankSection from "./QuestionBankSection";
 
 import {
+  QuestionEditor,
+  createEmptyQuestion,
+  normalizeQuestion,
+  normalizeQuestions,
+  validateQuestions,
+} from "../components/QuestionEngine";
+
+import {
   doc,
   getDoc,
   setDoc,
@@ -123,17 +131,11 @@ const WEEK_OPTIONS = Array.from(
 // HÀM TẠO DỮ LIỆU CÂU HỎI
 // ======================================================
 
-const createEmptyQuestion = (question = {}) => ({
-  question: question.question || "",
-  options: Array.from({ length: 4 }, (_, index) =>
-    question.options?.[index] || ""
-  ),
-  correctIndex: Number(question.correctIndex ?? 0),
-});
 
+// Tạo danh sách câu hỏi theo số lượng chặng
 const createEmptyQuestions = (count, source = []) => {
   return Array.from({ length: count }, (_, index) =>
-    createEmptyQuestion(source[index])
+    normalizeQuestion(source[index] || createEmptyQuestion())
   );
 };
 
@@ -215,7 +217,7 @@ const loadQuizFromFirestore = async ({ lop, mon, tuan }) => {
     exists: true,
     docId,
     questions: Array.isArray(data.questions)
-      ? data.questions.map(createEmptyQuestion)
+      ? normalizeQuestions(data.questions)
       : [],
     data,
   };
@@ -595,75 +597,71 @@ export default function TreasureMapConfigDialog({
   // LƯU FIRESTORE
   // --------------------------------------------------
 
-  const handleSaveQuestions = async () => {
-    if (loadingQuestions || savingQuestions) return;
+  
+const handleSaveQuestions = async () => {
+  if (loadingQuestions || savingQuestions) return;
 
-    if (
-      !draftGrade ||
-      !draftSubject ||
-      !draftWeek
-    ) {
-      showMessage("Vui lòng chọn đầy đủ Lớp, Môn và Tuần.", "warning");
-      return;
-    }
-
-    const normalizedQuestions = createEmptyQuestions(
-      draftStageCount,
-      draftQuestions
+  if (!draftGrade || !draftSubject || !draftWeek) {
+    showMessage(
+      "Vui lòng chọn đầy đủ Lớp, Môn và Tuần.",
+      "warning"
     );
+    return;
+  }
 
-    const hasEmptyQuestion = normalizedQuestions.some(
-      (item) => !item.question.trim()
+  const normalizedQuestions = normalizeQuestions(
+    createEmptyQuestions(draftStageCount, draftQuestions)
+  );
+
+  // Kiểm tra số câu hỏi phải bằng số chặng
+  if (normalizedQuestions.length !== draftStageCount) {
+    showMessage(
+      "Số câu hỏi phải bằng số chặng của bản đồ.",
+      "warning"
     );
+    return;
+  }
 
-    if (hasEmptyQuestion) {
-      showMessage(
-        "Vui lòng nhập nội dung câu hỏi cho tất cả các chặng.",
-        "warning"
-      );
-      return;
-    }
+  // Kiểm tra hợp lệ theo từng dạng câu hỏi
+  const validation = validateQuestions(normalizedQuestions);
 
-    const hasEmptyOption = normalizedQuestions.some(
-      (item) => item.options.some((option) => !option.trim())
+  if (!validation.valid) {
+    showMessage(validation.message, "warning");
+    return;
+  }
+
+  setSavingQuestions(true);
+
+  try {
+    const docId = await saveQuizToFirestore({
+      lop: draftGrade,
+      mon: draftSubject,
+      tuan: draftWeek,
+      questions: normalizedQuestions,
+    });
+
+    // Cập nhật dữ liệu đã chuẩn hóa lên giao diện
+    setDraftQuestions(normalizedQuestions);
+
+    setHasExistingQuestions(true);
+    setLoadedDocId(docId);
+
+    showMessage(
+      `Đã lưu thành công: ${docId}`,
+      "success"
     );
+  } catch (error) {
+    console.error("Lỗi lưu câu hỏi:", error);
 
-    if (hasEmptyOption) {
-      showMessage(
-        "Vui lòng nhập đầy đủ 4 phương án trả lời cho tất cả các chặng.",
-        "warning"
-      );
-      return;
-    }
+    showMessage(
+      "Lưu câu hỏi thất bại. Vui lòng kiểm tra kết nối Firestore.",
+      "error"
+    );
+  } finally {
+    setSavingQuestions(false);
+  }
+};
 
-    setSavingQuestions(true);
-
-    try {
-      const docId = await saveQuizToFirestore({
-        lop: draftGrade,
-        mon: draftSubject,
-        tuan: draftWeek,
-        questions: normalizedQuestions,
-      });
-
-      setHasExistingQuestions(true);
-      setLoadedDocId(docId);
-
-      showMessage(
-        `Đã lưu thành công: ${docId}`,
-        "success"
-      );
-    } catch (error) {
-      console.error("Lỗi lưu câu hỏi:", error);
-
-      showMessage(
-        "Lưu câu hỏi thất bại. Vui lòng kiểm tra kết nối Firestore.",
-        "error"
-      );
-    } finally {
-      setSavingQuestions(false);
-    }
-  };
 
   // --------------------------------------------------
   // TẢI LẠI CÂU HỎI HIỆN TẠI
@@ -1192,34 +1190,12 @@ return (
         {/* 4. NGÂN HÀNG CÂU HỎI */}
         {/* ========================================== */}
 
-        <QuestionBankSection
-          draftMode={draftMode}
-          draftGrade={draftGrade}
-          setDraftGrade={setDraftGrade}
-          draftSubject={draftSubject}
-          setDraftSubject={setDraftSubject}
-          draftWeek={draftWeek}
-          setDraftWeek={setDraftWeek}
-          GRADE_OPTIONS={GRADE_OPTIONS}
-          SUBJECT_OPTIONS={SUBJECT_OPTIONS}
-          WEEK_OPTIONS={WEEK_OPTIONS}
-          fieldSx={fieldSx}
-          questionBankName={questionBankName}
-          loadingQuestions={loadingQuestions}
-          savingQuestions={savingQuestions}
-          handleReloadQuestions={handleReloadQuestions}
-          hasExistingQuestions={hasExistingQuestions}
-          currentStage={currentStage}
-          currentQuestion={currentQuestion}
-          draftStageCount={draftStageCount}
-          draftQuestions={draftQuestions}
-          handleSelectStage={handleSelectStage}
-          updateQuestion={updateQuestion}
-          optionLabels={optionLabels}
-          updateOption={updateOption}
-          updateCorrectAnswer={updateCorrectAnswer}
-          handlePreviousStage={handlePreviousStage}
-          handleNextStage={handleNextStage}
+        <QuestionEditor
+          questions={draftQuestions}
+          onChange={setDraftQuestions}
+          title="NGÂN HÀNG CÂU HỎI"
+          minQuestions={draftStageCount}
+          maxQuestions={draftStageCount}
         />
 
         {/* ------------------------------------------ */}

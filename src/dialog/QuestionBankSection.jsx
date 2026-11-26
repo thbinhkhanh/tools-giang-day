@@ -52,9 +52,60 @@ export default function QuestionBankSection({
   optionLabels,
   updateOption,
   updateCorrectAnswer,
+
+  updateQuestionType,
+  updateCorrectIndexes,
+  updateTrueFalseAnswer,
+  updateCorrectOrder,
+  updateAcceptedAnswers,
+  updatePairs,
+
   handlePreviousStage,
   handleNextStage,
 }) {
+
+  const isQuestionComplete = (item) => {
+    if (!item?.question?.trim()) return false;
+
+    switch (item.type || "single") {
+      case "single":
+        return (
+          item.options?.filter((x) => x.trim()).length >= 2 &&
+          item.options?.[item.correctIndex]?.trim()
+        );
+
+      case "multiple":
+        return (
+          item.options?.filter((x) => x.trim()).length >= 2 &&
+          item.correctIndexes?.length > 0
+        );
+
+      case "true_false":
+        return typeof item.correctAnswer === "boolean";
+
+      case "ordering":
+        return (
+          item.options?.filter((x) => x.trim()).length >= 2 &&
+          item.correctOrder?.length ===
+            item.options.filter((x) => x.trim()).length
+        );
+
+      case "fill_blank":
+        return item.acceptedAnswers?.some((x) => x.trim());
+
+      case "matching":
+        return (
+          item.pairs?.length >= 2 &&
+          item.pairs.every(
+            (pair) => pair.left.trim() && pair.right.trim()
+          )
+        );
+
+      default:
+        return false;
+    }
+  };
+
   return (
     <>
       {draftMode === "quiz" && (
@@ -358,133 +409,351 @@ export default function QuestionBankSection({
                 }}
               />
 
+              {/* CHỌN DẠNG CÂU HỎI */}
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Dạng câu hỏi"
+                value={currentQuestion.type || "single"}
+                onChange={(e) => updateQuestionType(e.target.value)}
+                sx={{ ...fieldSx, mb: 2 }}
+              >
+                <MenuItem value="single">Trắc nghiệm một đáp án</MenuItem>
+                <MenuItem value="multiple">Trắc nghiệm nhiều đáp án</MenuItem>
+                <MenuItem value="true_false">Đúng / Sai</MenuItem>
+                <MenuItem value="ordering">Sắp xếp thứ tự</MenuItem>
+                <MenuItem value="fill_blank">Điền từ hoặc đáp án</MenuItem>
+                <MenuItem value="matching">Nối cặp</MenuItem>
+              </TextField>
+
               {/* CÁC PHƯƠNG ÁN */}
 
-              <Typography
-                fontSize={14}
-                fontWeight={900}
-                color="#475569"
-                mb={1.2}
-              >
-                CÁC PHƯƠNG ÁN TRẢ LỜI
-              </Typography>
+              {/* NỘI DUNG ĐÁP ÁN THEO DẠNG CÂU HỎI */}
 
-              <Box
-                display="flex"
-                flexDirection="column"
-                gap={1.2}
-              >
-                {currentQuestion.options.map((option, index) => {
-                  const selected =
-                    currentQuestion.correctIndex === index;
+              {(currentQuestion.type || "single") === "single" && (
+                <>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1.2}>
+                    CÁC PHƯƠNG ÁN TRẢ LỜI
+                  </Typography>
 
-                  return (
-                    <Box
-                      key={index}
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
+                  <Box display="flex" flexDirection="column" gap={1.2}>
+                    {currentQuestion.options.map((option, index) => {
+                      const selected = currentQuestion.correctIndex === index;
+
+                      return (
+                        <Box key={index} display="flex" alignItems="center" gap={1}>
+                          <Box
+                            sx={{
+                              width: 38,
+                              height: 42,
+                              flexShrink: 0,
+                              borderRadius: 1.8,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              bgcolor: selected ? "#dcfce7" : "#f1f5f9",
+                              color: selected ? "#15803d" : "#64748b",
+                              fontSize: 15,
+                              fontWeight: 900,
+                            }}
+                          >
+                            {optionLabels[index]}
+                          </Box>
+
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder={`Nhập đáp án ${optionLabels[index]}`}
+                            value={option}
+                            onChange={(e) => updateOption(index, e.target.value)}
+                            sx={{
+                              ...fieldSx,
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: 2,
+                                bgcolor: "#f8fafc",
+                                fontSize: 14,
+                              },
+                            }}
+                          />
+
+                          <Button
+                            size="small"
+                            variant={selected ? "contained" : "outlined"}
+                            onClick={() => updateCorrectAnswer(index)}
+                            sx={{
+                              minWidth: { xs: 43, sm: 82 },
+                              height: 46,
+                              px: { xs: 0.5, sm: 1 },
+                              borderRadius: 2,
+                              fontSize: 13,
+                              fontWeight: 900,
+                              borderColor: selected ? "#16a34a" : "#cbd5e1",
+                              bgcolor: selected ? "#16a34a" : "#fff",
+                              color: selected ? "#fff" : "#64748b",
+                            }}
+                          >
+                            {selected ? (
+                              <CheckCircleRoundedIcon sx={{ fontSize: 21 }} />
+                            ) : (
+                              "Chọn"
+                            )}
+                          </Button>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  <Alert severity="success" sx={{ mt: 1.8 }}>
+                    Đáp án đúng: {optionLabels[currentQuestion.correctIndex] || "Chưa chọn"}
+                  </Alert>
+                </>
+              )}
+
+              {currentQuestion.type === "multiple" && (
+                <>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1}>
+                    CÁC PHƯƠNG ÁN – CHỌN TẤT CẢ ĐÁP ÁN ĐÚNG
+                  </Typography>
+
+                  <Typography fontSize={12} color="text.secondary" mb={1}>
+                    Có thể chọn nhiều đáp án đúng cho một câu hỏi.
+                  </Typography>
+
+                  <Box display="flex" flexDirection="column" gap={1.2}>
+                    {currentQuestion.options.map((option, index) => {
+                      const selected = (currentQuestion.correctIndexes || []).includes(index);
+
+                      return (
+                        <Box key={index} display="flex" alignItems="center" gap={1}>
+                          <Box
+                            sx={{
+                              width: 38,
+                              height: 42,
+                              flexShrink: 0,
+                              borderRadius: 1.8,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              bgcolor: selected ? "#dcfce7" : "#f1f5f9",
+                              color: selected ? "#15803d" : "#64748b",
+                              fontWeight: 900,
+                            }}
+                          >
+                            {optionLabels[index]}
+                          </Box>
+
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder={`Nhập đáp án ${optionLabels[index]}`}
+                            value={option}
+                            onChange={(e) => updateOption(index, e.target.value)}
+                            sx={fieldSx}
+                          />
+
+                          <Button
+                            variant={selected ? "contained" : "outlined"}
+                            onClick={() => updateCorrectIndexes(index)}
+                            sx={{
+                              minWidth: { xs: 43, sm: 82 },
+                              height: 46,
+                              borderRadius: 2,
+                              fontWeight: 800,
+                              bgcolor: selected ? "#16a34a" : "#fff",
+                              color: selected ? "#fff" : "#64748b",
+                            }}
+                          >
+                            {selected ? "Đúng" : "Chọn"}
+                          </Button>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  <Alert severity="success" sx={{ mt: 1.8 }}>
+                    Đáp án đúng: {(currentQuestion.correctIndexes || [])
+                      .map((i) => optionLabels[i])
+                      .join(", ") || "Chưa chọn"}
+                  </Alert>
+                </>
+              )}
+
+              {currentQuestion.type === "true_false" && (
+                <Box>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1.5}>
+                    CHỌN ĐÁP ÁN ĐÚNG
+                  </Typography>
+
+                  <Box display="flex" gap={1.5}>
+                    <Button
+                      fullWidth
+                      variant={currentQuestion.correctAnswer === true ? "contained" : "outlined"}
+                      onClick={() => updateTrueFalseAnswer(true)}
+                      sx={{
+                        minHeight: 55,
+                        borderRadius: 2,
+                        fontWeight: 900,
+                        bgcolor: currentQuestion.correctAnswer === true ? "#16a34a" : "#fff",
+                      }}
                     >
-                      {/* KÝ HIỆU ĐÁP ÁN */}
+                      ĐÚNG
+                    </Button>
 
-                      <Box
-                        sx={{
-                          width: 38,
-                          height: 42,
-                          flexShrink: 0,
-                          borderRadius: 1.8,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          bgcolor: selected ? "#dcfce7" : "#f1f5f9",
-                          color: selected ? "#15803d" : "#64748b",
-                          fontSize: 15,
-                          fontWeight: 900,
-                        }}
-                      >
-                        {optionLabels[index]}
-                      </Box>
+                    <Button
+                      fullWidth
+                      variant={currentQuestion.correctAnswer === false ? "contained" : "outlined"}
+                      onClick={() => updateTrueFalseAnswer(false)}
+                      sx={{
+                        minHeight: 55,
+                        borderRadius: 2,
+                        fontWeight: 900,
+                        bgcolor: currentQuestion.correctAnswer === false ? "#dc2626" : "#fff",
+                      }}
+                    >
+                      SAI
+                    </Button>
+                  </Box>
 
-                      {/* Ô NHẬP ĐÁP ÁN */}
+                  <Alert severity="success" sx={{ mt: 1.8 }}>
+                    Đáp án đúng: {
+                      currentQuestion.correctAnswer === true
+                        ? "ĐÚNG"
+                        : currentQuestion.correctAnswer === false
+                          ? "SAI"
+                          : "Chưa chọn"
+                    }
+                  </Alert>
+                </Box>
+              )}
 
+              {currentQuestion.type === "ordering" && (
+                <Box>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1}>
+                    NHẬP CÁC NỘI DUNG CẦN SẮP XẾP
+                  </Typography>
+
+                  <Typography fontSize={12} color="text.secondary" mb={1.5}>
+                    Nhập nội dung từng mục và chọn thứ tự đúng của mục đó.
+                  </Typography>
+
+                  {currentQuestion.options.map((option, index) => (
+                    <Box key={index} display="flex" alignItems="center" gap={1} mb={1}>
                       <TextField
                         fullWidth
                         size="small"
-                        placeholder={`Nhập đáp án ${optionLabels[index]}`}
+                        label={`Nội dung ${optionLabels[index]}`}
                         value={option}
-                        onChange={(e) =>
-                          updateOption(index, e.target.value)
-                        }
-                        sx={{
-                          ...fieldSx,
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: 2,
-                            bgcolor: "#f8fafc",
-                            fontSize: 14,
-                          },
-                        }}
+                        onChange={(e) => updateOption(index, e.target.value)}
+                        sx={fieldSx}
                       />
 
-                      {/* CHỌN ĐÁP ÁN ĐÚNG */}
-
-                      <Button
+                      <TextField
+                        select
                         size="small"
-                        variant={selected ? "contained" : "outlined"}
-                        onClick={() => updateCorrectAnswer(index)}
-                        sx={{
-                          minWidth: { xs: 43, sm: 82 },
-                          height: 46,
-                          px: { xs: 0.5, sm: 1 },
-                          borderRadius: 2,
-                          fontSize: 13,
-                          fontWeight: 900,
-                          borderColor: selected ? "#16a34a" : "#cbd5e1",
-                          bgcolor: selected ? "#16a34a" : "#fff",
-                          color: selected ? "#fff" : "#64748b",
-                          "&:hover": {
-                            bgcolor: selected ? "#15803d" : "#dcfce7",
-                            borderColor: "#16a34a",
-                          },
+                        label="Thứ tự"
+                        value={
+                          (currentQuestion.correctOrder || []).indexOf(index) >= 0
+                            ? (currentQuestion.correctOrder || []).indexOf(index) + 1
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const order = [...(currentQuestion.correctOrder || [])];
+                          const position = Number(e.target.value) - 1;
+
+                          const oldPosition = order.indexOf(index);
+                          if (oldPosition >= 0) order.splice(oldPosition, 1);
+
+                          order[position] = index;
+
+                          updateCorrectOrder(order);
                         }}
+                        sx={{ width: 110, flexShrink: 0 }}
                       >
-                        {selected ? (
-                          <CheckCircleRoundedIcon sx={{ fontSize: 21 }} />
-                        ) : (
-                          "Chọn"
-                        )}
-                      </Button>
+                        {currentQuestion.options.map((_, i) => (
+                          <MenuItem key={i} value={i + 1}>
+                            {i + 1}
+                          </MenuItem>
+                        ))}
+                      </TextField>
                     </Box>
-                  );
-                })}
-              </Box>
+                  ))}
 
-              {/* ĐÁP ÁN ĐÚNG */}
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    Chọn thứ tự từ 1 đến {currentQuestion.options.length} cho các mục.
+                  </Alert>
+                </Box>
+              )}
 
-              <Box
-                mt={1.8}
-                p={1.4}
-                borderRadius={2}
-                sx={{
-                  bgcolor: "#f0fdf4",
-                  border: "1px solid #bbf7d0",
-                }}
-              >
-                <Typography
-                  fontSize={14}
-                  fontWeight={900}
-                  color="#15803d"
-                >
-                  <CheckCircleRoundedIcon
-                    sx={{
-                      fontSize: 19,
-                      verticalAlign: "middle",
-                      mr: 0.6,
-                    }}
+              {currentQuestion.type === "fill_blank" && (
+                <Box>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1}>
+                    ĐÁP ÁN ĐƯỢC CHẤP NHẬN
+                  </Typography>
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    label="Nhập đáp án đúng"
+                    placeholder="Ví dụ: Hà Nội, Thủ đô Hà Nội"
+                    value={(currentQuestion.acceptedAnswers || []).join(", ")}
+                    onChange={(e) =>
+                      updateAcceptedAnswers(
+                        e.target.value.split(",").map((item) => item.trim())
+                      )
+                    }
+                    helperText="Nếu có nhiều cách trả lời đúng, hãy phân cách bằng dấu phẩy."
+                    sx={fieldSx}
                   />
+                </Box>
+              )}
 
-                  ĐÁP ÁN ĐÚNG: {optionLabels[currentQuestion.correctIndex]}
-                </Typography>
-              </Box>
+              {currentQuestion.type === "matching" && (
+                <Box>
+                  <Typography fontSize={14} fontWeight={900} color="#475569" mb={1}>
+                    CÁC CẶP NỘI DUNG CẦN NỐI
+                  </Typography>
+
+                  <Typography fontSize={12} color="text.secondary" mb={1.5}>
+                    Nhập nội dung tương ứng ở cột trái và cột phải.
+                  </Typography>
+
+                  {(currentQuestion.pairs || []).map((pair, index) => (
+                    <Box
+                      key={index}
+                      display="grid"
+                      gridTemplateColumns="1fr 1fr"
+                      gap={1}
+                      mb={1.2}
+                    >
+                      <TextField
+                        size="small"
+                        label={`Vế trái ${index + 1}`}
+                        value={pair.left}
+                        onChange={(e) => {
+                          const pairs = [...currentQuestion.pairs];
+                          pairs[index] = { ...pairs[index], left: e.target.value };
+                          updatePairs(pairs);
+                        }}
+                        sx={fieldSx}
+                      />
+
+                      <TextField
+                        size="small"
+                        label={`Vế phải ${index + 1}`}
+                        value={pair.right}
+                        onChange={(e) => {
+                          const pairs = [...currentQuestion.pairs];
+                          pairs[index] = { ...pairs[index], right: e.target.value };
+                          updatePairs(pairs);
+                        }}
+                        sx={fieldSx}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              )}
 
               <Divider sx={{ my: 2 }} />
 
