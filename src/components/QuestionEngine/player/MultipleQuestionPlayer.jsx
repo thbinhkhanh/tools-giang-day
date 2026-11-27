@@ -17,6 +17,19 @@ export default function MultipleQuestionPlayer({
 }) {
   const selected = Array.isArray(answer) ? answer : [];
 
+  // Chỉ lấy các phương án có nội dung
+  // Giữ nguyên chỉ số gốc của phương án
+  const options = Array.isArray(question?.options)
+    ? question.options
+        .map((option, index) => ({
+          content: option,
+          originalIndex: index,
+        }))
+        .filter(
+          (item) => String(item.content ?? "").trim() !== ""
+        )
+    : [];
+
   const handleToggle = (index) => {
     if (disabled) return;
 
@@ -41,8 +54,9 @@ export default function MultipleQuestionPlayer({
         {question.question}
       </Typography>
 
-      {/* Danh sách phương án */}
-      {(question.options || []).map((option, index) => {
+      {/* Danh sách phương án hợp lệ */}
+      {options.map((option) => {
+        const index = option.originalIndex;
         const isSelected = selected.includes(index);
 
         return (
@@ -96,7 +110,7 @@ export default function MultipleQuestionPlayer({
                     overflowWrap: "anywhere",
                   }}
                 >
-                  {String.fromCharCode(65 + index)}. {option}
+                  {String.fromCharCode(65 + index)}. {option.content}
                 </Typography>
               }
             />

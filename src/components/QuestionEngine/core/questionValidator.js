@@ -106,15 +106,21 @@ export const validateQuestion = (rawQuestion) => {
     }
 
     case "fill_blank": {
-      if (!question.acceptedAnswers.some((item) => item.trim())) {
-        return {
-          valid: false,
-          message: "Cần nhập ít nhất một đáp án được chấp nhận.",
-        };
-      }
+        const hasValidAnswer = (question.acceptedAnswers || []).some((item) =>
+            Array.isArray(item)
+            ? item.some((answer) => String(answer ?? "").trim() !== "")
+            : String(item ?? "").trim() !== ""
+        );
 
-      break;
-    }
+        if (!hasValidAnswer) {
+            return {
+            valid: false,
+            message: "Cần nhập ít nhất một đáp án được chấp nhận.",
+            };
+        }
+
+        break;
+        }
 
     case "matching": {
       if (question.pairs.length < 2) {

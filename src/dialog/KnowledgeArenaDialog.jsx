@@ -633,7 +633,19 @@ export default function KnowledgeArenaDialog({ open, onClose }) {
             minHeight: 0,
             overflowY: "auto",
             overflowX: "hidden",
-            bgcolor: "#f8fbff",
+
+            backgroundImage: `
+              linear-gradient(
+                rgba(239, 246, 255, 0.88),
+                rgba(248, 250, 255, 0.92)
+              ),
+              url("/knowledge-arena-bg.jpg")
+            `,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            backgroundAttachment: "local",
+
             display: "flex",
             flexDirection: "column",
           }}

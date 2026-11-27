@@ -50,6 +50,9 @@ import LearningLeaderboardDialog from "../dialog/LearningLeaderboardDialog";
 import KnowledgeArenaDialog from "../dialog/KnowledgeArenaDialog";
 import AccountsDialog from "../dialog/AccountsDialog";
 
+import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
+import PhieuHocTap from "./PhieuHocTap";
+
 export default function Tools() {
   const {
     setUploadedStudentsForClass,
@@ -132,6 +135,83 @@ export default function Tools() {
     type: "success",
     text: "",
   });
+
+  // Danh sách tất cả môn học
+const SUBJECT_OPTIONS = [
+  "Tiếng Việt",
+  "Toán",
+  "Đạo đức",
+  "Tự nhiên và Xã hội",
+  "Khoa học",
+  "Lịch sử và Địa lí",
+  "Tin học",
+  "Công nghệ",
+  "Tiếng Anh",
+  "Âm nhạc",
+  "Mĩ thuật",
+  "Giáo dục thể chất",
+  "Hoạt động trải nghiệm",
+  "Tiếng dân tộc",
+];
+
+// Môn học được chọn
+const [selectedSubject, setSelectedSubject] = useState("");
+const [loadingSubject, setLoadingSubject] = useState(true);
+
+// Đọc môn học đã lưu từ Firestore
+useEffect(() => {
+  const loadSavedSubject = async () => {
+    const username = currentUser?.username?.trim().toLowerCase();
+    if (!username) {
+      setLoadingSubject(false);
+      return;
+    }
+
+    try {
+      const userRef = doc(db, "USERS", username);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const savedSubject = userSnap.data().monHoc || "";
+
+        setSelectedSubject(
+          SUBJECT_OPTIONS.includes(savedSubject) ? savedSubject : ""
+        );
+      }
+    } catch (error) {
+      console.error("Lỗi tải môn học:", error);
+    } finally {
+      setLoadingSubject(false);
+    }
+  };
+
+  loadSavedSubject();
+}, [currentUser?.username]);
+
+// Khi chọn môn: lưu vào Firestore
+const handleSubjectChange = async (event) => {
+  const value = event.target.value;
+
+  setSelectedSubject(value);
+
+  const username = currentUser?.username?.trim().toLowerCase();
+  if (!username || !value) return;
+
+  try {
+    const userRef = doc(db, "USERS", username);
+
+    await updateDoc(userRef, {
+      monHoc: value,
+    });
+  } catch (error) {
+    console.error("Lỗi lưu môn học:", error);
+    setUploadMessage({
+      open: true,
+      type: "error",
+      text: "Không thể lưu môn học đã chọn.",
+    });
+  }
+};
   
   const handleUploadStudentExcel = async (event) => {
     const file = event.target.files?.[0];
@@ -416,6 +496,14 @@ const handleWeekChange = async (event) => {
           icon: <QuizRoundedIcon />,
           iconColor: "#7C3AED",
           iconBg: "#EDE9FE",
+        },
+        {
+          id: "phieu-hoc-tap",
+          title: "Phiếu học tập",
+          description: "Tổ chức làm bài, chấm điểm và lưu kết quả học tập",
+          icon: <FactCheckRoundedIcon />,
+          iconColor: "#0284C7",
+          iconBg: "#E0F2FE",
         },
         {
           id: "leaderboard",
@@ -762,6 +850,15 @@ useEffect(() => {
             onClose={handleToolClose}
           />
         );
+      
+      case "phieu-hoc-tap":
+        return (
+          <PhieuHocTap
+            selectedClass={selectedClass}
+            week={week}
+            students={activeStudents}
+          />
+        );
 
       default:
         return null;
@@ -860,21 +957,23 @@ useEffect(() => {
         </Box>
       );
     }
-
+    
     return (
       <Box
         sx={{
           width: "100%",
-          minHeight: "100vh",
-          height: "100vh",
-          overflow: "hidden",
+          minHeight: "calc(100vh - 48px)",
+          height: "auto",
+          overflow: "visible",
           position: "relative",
           background: "#fff",
+          boxSizing: "border-box",
         }}
       >
         {renderTool(activeToolId)}
       </Box>
     );
+
   }
 
   // =========================================
@@ -1202,13 +1301,13 @@ return (
               </Box>
             </Box>
 
-            {/* 3. SĨ SỐ HỌC SINH */}
+            {/* 3. CHỌN MÔN HỌC */}
             <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
-                gap: 1,
-                px: 1.5,
+                gap: 0.75,
+                px: 1,
                 height: 56,
                 boxSizing: "border-box",
                 borderRadius: 2.5,
@@ -1222,10 +1321,11 @@ return (
                   alignItems: "center",
                   justifyContent: "center",
                   color: "#bfdbfe",
+                  flexShrink: 0,
                   "& svg": { fontSize: 19 },
                 }}
               >
-                <GroupsRoundedIcon />
+                <SchoolRoundedIcon />
               </Box>
 
               <Box
@@ -1233,18 +1333,51 @@ return (
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "center",
+                  minWidth: 0,
                 }}
               >
-                <Typography
+                <TextField
+                  select
+                  variant="standard"
+                  value={selectedSubject}
+                  onChange={handleSubjectChange}
+                  disabled={loadingSubject}
+                  SelectProps={{ displayEmpty: true }}
+                  InputProps={{ disableUnderline: true }}
                   sx={{
-                    fontSize: 14,
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    color: "#fff",
+                    width: "max-content",
+                    minWidth: 60,
+                    maxWidth: 190,
+
+                    "& .MuiInputBase-root": {
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 900,
+                      lineHeight: 1.2,
+                    },
+
+                    "& .MuiSelect-select": {
+                      py: 0,
+                      pr: "24px !important",
+                      whiteSpace: "nowrap",
+                    },
+
+                    "& .MuiSelect-icon": {
+                      color: "#bfdbfe",
+                      fontSize: 18,
+                    },
                   }}
                 >
-                  {activeStudents.length}
-                </Typography>
+                  <MenuItem value="">
+                    <em>Chọn môn học</em>
+                  </MenuItem>
+
+                  {SUBJECT_OPTIONS.map((item) => (
+                    <MenuItem key={item} value={item}>
+                      {item}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
                 <Typography
                   sx={{
@@ -1253,7 +1386,7 @@ return (
                     lineHeight: 1.2,
                   }}
                 >
-                  Sĩ số học sinh
+                  Môn học
                 </Typography>
               </Box>
             </Box>

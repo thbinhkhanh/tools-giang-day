@@ -16,20 +16,18 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
-} from "@dnd-kit/core";
-
-import {
-  useDraggable,
   useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
 
 import { CSS } from "@dnd-kit/utilities";
+
 import {
   DragIndicator,
   Close,
 } from "@mui/icons-material";
 
-// Màu sắc cho từng cặp
+// Màu sắc cho từng cặp ghép
 const PAIR_COLORS = [
   "#2563eb",
   "#16a34a",
@@ -51,7 +49,7 @@ const shuffleArray = (array) => {
   return result;
 };
 
-// Thẻ cột A - vùng nhận kéo thả
+// Thẻ cột A
 function MatchingLeftCard({
   id,
   index,
@@ -83,20 +81,24 @@ function MatchingLeftCard({
         alignItems: "center",
         gap: 1,
         border: "1.5px solid",
-        borderColor:
-          isOver || selected
-            ? "#2563eb"
-            : connected
-            ? color
-            : "#dbe3ee",
-        bgcolor:
-          isOver || selected
-            ? "#eff6ff"
-            : connected
-            ? `${color}12`
-            : "#fff",
+
+        borderColor: isOver
+          ? "#2563eb"
+          : connected
+          ? color
+          : selected
+          ? "#2563eb"
+          : "#dbe3ee",
+
+        bgcolor: connected
+          ? `${color}12`
+          : selected || isOver
+          ? "#eff6ff"
+          : "#fff",
+
         cursor: disabled ? "default" : "pointer",
         transition: "all .2s",
+
         boxShadow: selected
           ? "0 0 0 2px rgba(37,99,235,.12)"
           : "none",
@@ -174,7 +176,7 @@ function MatchingLeftCard({
   );
 }
 
-// Thẻ cột B - có thể kéo thả
+// Thẻ cột B
 function MatchingRightCard({
   id,
   index,
@@ -214,24 +216,26 @@ function MatchingRightCard({
         alignItems: "center",
         gap: 1,
         border: "1.5px solid",
-        borderColor:
-          selected
-            ? "#2563eb"
-            : connected
-            ? color
-            : "#dbe3ee",
-        bgcolor:
-          selected
-            ? "#eff6ff"
-            : connected
-            ? `${color}12`
-            : "#fff",
+
+        borderColor: connected
+          ? color
+          : selected
+          ? "#2563eb"
+          : "#dbe3ee",
+
+        bgcolor: connected
+          ? `${color}12`
+          : selected
+          ? "#eff6ff"
+          : "#fff",
+
         cursor: disabled ? "default" : "grab",
         transform: CSS.Transform.toString(transform),
         transition,
         touchAction: "none",
         userSelect: "none",
         opacity: isDragging ? 0.45 : 1,
+
         boxShadow: isDragging
           ? "0 8px 20px rgba(37,99,235,.18)"
           : "none",
@@ -284,7 +288,8 @@ export default function MatchingQuestionPlayer({
   onChange,
   disabled = false,
 }) {
-  // Lọc các cặp hợp lệ nhưng giữ nguyên chỉ số Firestore
+  // Chỉ lấy các cặp có đủ nội dung hai vế
+  // Giữ nguyên chỉ số gốc để không sai dữ liệu đáp án
   const pairs = Array.isArray(question?.pairs)
     ? question.pairs
         .map((pair, index) => ({
@@ -293,34 +298,42 @@ export default function MatchingQuestionPlayer({
         }))
         .filter(
           (pair) =>
-            pair &&
-            String(pair.left ?? "").trim() !== "" &&
-            String(pair.right ?? "").trim() !== ""
+            String(pair?.left ?? "").trim() !== "" &&
+            String(pair?.right ?? "").trim() !== ""
         )
     : [];
 
-  // Đáp án luôn là mảng
+  // Danh sách chỉ số gốc của các cặp hợp lệ
+  const pairIndexes = pairs.map(
+    (pair) => pair.originalIndex
+  );
+
+  const pairKey = pairIndexes.join(",");
+
+  // Đáp án
   const selectedAnswers = Array.isArray(answer)
     ? answer
     : [];
 
   // Xáo trộn cột B
   const [rightOrder, setRightOrder] = useState(() =>
-    shuffleArray(pairs.map((pair) => pair.originalIndex))
+    shuffleArray(pairIndexes)
   );
 
   const [selectedLeft, setSelectedLeft] = useState(null);
   const [selectedRight, setSelectedRight] = useState(null);
 
-  // Khi chuyển câu hỏi, xáo trộn lại và bỏ lựa chọn tạm
+  // Lưu màu theo cặp ghép thực tế
+  const [pairColorMap, setPairColorMap] = useState({});
+
+  // Khi chuyển câu hỏi hoặc danh sách cặp thay đổi
   useEffect(() => {
-    setRightOrder(
-      shuffleArray(pairs.map((pair) => pair.originalIndex))
-    );
+    setRightOrder(shuffleArray(pairIndexes));
 
     setSelectedLeft(null);
     setSelectedRight(null);
-  }, [question]);
+    setPairColorMap({});
+  }, [question, pairKey]);
 
   // Cấu hình kéo thả
   const sensors = useSensors(
@@ -329,6 +342,7 @@ export default function MatchingQuestionPlayer({
         distance: 5,
       },
     }),
+
     useSensor(TouchSensor, {
       activationConstraint: {
         delay: 150,
@@ -337,16 +351,25 @@ export default function MatchingQuestionPlayer({
     })
   );
 
-  // Tạo đáp án mới
+  // Ghép hai thẻ
   const connectPair = (leftIndex, rightIndex) => {
     if (disabled) return;
 
+    // Chỉ cho phép ghép các cặp hợp lệ
+    if (
+      !pairIndexes.includes(leftIndex) ||
+      !pairIndexes.includes(rightIndex)
+    ) {
+      return;
+    }
+
+    // Giữ nguyên cấu trúc đáp án theo chỉ số gốc
     const next = Array.from(
       { length: question.pairs.length },
       (_, index) => selectedAnswers[index] ?? null
     );
 
-    // Xóa kết nối cũ nếu nội dung bên phải đã được sử dụng
+    // Xóa kết nối cũ nếu thẻ B đã được sử dụng
     next.forEach((value, index) => {
       if (value === rightIndex && index !== leftIndex) {
         next[index] = null;
@@ -355,6 +378,36 @@ export default function MatchingQuestionPlayer({
 
     // Gán kết nối mới
     next[leftIndex] = rightIndex;
+
+    // Giữ màu của cặp vừa ghép
+    setPairColorMap((previous) => {
+      const updated = { ...previous };
+
+      if (!updated[leftIndex]) {
+        const usedColors = Object.values(updated);
+
+        const nextColor =
+          PAIR_COLORS.find(
+            (color) => !usedColors.includes(color)
+          ) || PAIR_COLORS[leftIndex % PAIR_COLORS.length];
+
+        updated[leftIndex] = nextColor;
+      }
+
+      // Xóa màu của thẻ A cũ nếu thẻ B được chuyển sang cặp khác
+      Object.keys(updated).forEach((key) => {
+        const index = Number(key);
+
+        if (
+          index !== leftIndex &&
+          selectedAnswers[index] === rightIndex
+        ) {
+          delete updated[index];
+        }
+      });
+
+      return updated;
+    });
 
     onChange?.(next);
 
@@ -371,8 +424,8 @@ export default function MatchingQuestionPlayer({
       return;
     }
 
-    setSelectedLeft((prev) =>
-      prev === leftIndex ? null : leftIndex
+    setSelectedLeft((previous) =>
+      previous === leftIndex ? null : leftIndex
     );
   };
 
@@ -385,12 +438,12 @@ export default function MatchingQuestionPlayer({
       return;
     }
 
-    setSelectedRight((prev) =>
-      prev === rightIndex ? null : rightIndex
+    setSelectedRight((previous) =>
+      previous === rightIndex ? null : rightIndex
     );
   };
 
-  // Xử lý kéo thả
+  // Kéo thả
   const handleDragEnd = ({ active, over }) => {
     if (!over || disabled) return;
 
@@ -418,20 +471,28 @@ export default function MatchingQuestionPlayer({
 
     onChange?.(next);
 
+    setPairColorMap((previous) => {
+      const updated = { ...previous };
+      delete updated[leftIndex];
+      return updated;
+    });
+
     setSelectedLeft(null);
     setSelectedRight(null);
   };
 
-  // Đếm số cặp đã ghép
-  const connectedCount = pairs.filter(
-    (pair) =>
-      Number.isInteger(selectedAnswers[pair.originalIndex])
+  // Đếm số cặp đã ghép hợp lệ
+  const connectedCount = pairs.filter((pair) =>
+    Number.isInteger(
+      selectedAnswers[pair.originalIndex]
+    )
   ).length;
 
   if (!question) return null;
 
   return (
     <Box>
+      {/* Nội dung câu hỏi */}
       <Typography
         fontWeight={700}
         mb={1.2}
@@ -479,14 +540,16 @@ export default function MatchingQuestionPlayer({
 
                 {pairs.map((pair) => {
                   const index = pair.originalIndex;
+
                   const isConnected =
-                    Number.isInteger(selectedAnswers[index]);
+                    Number.isInteger(
+                      selectedAnswers[index]
+                    );
 
                   const color =
+                    pairColorMap[index] ||
                     PAIR_COLORS[
-                      pairs.findIndex(
-                        (item) => item.originalIndex === index
-                      ) % PAIR_COLORS.length
+                      index % PAIR_COLORS.length
                     ];
 
                   return (
@@ -538,15 +601,17 @@ export default function MatchingQuestionPlayer({
                       (value) => value === rightIndex
                     );
 
-                  const isConnected = connectedLeft !== -1;
+                  const isConnected =
+                    connectedLeft !== -1;
 
-                  const color =
-                    PAIR_COLORS[
-                      pairs.findIndex(
-                        (item) =>
-                          item.originalIndex === rightIndex
-                      ) % PAIR_COLORS.length
-                    ];
+                  const color = isConnected
+                    ? pairColorMap[connectedLeft] ||
+                      PAIR_COLORS[
+                        connectedLeft % PAIR_COLORS.length
+                      ]
+                    : PAIR_COLORS[
+                        rightIndex % PAIR_COLORS.length
+                      ];
 
                   return (
                     <MatchingRightCard
@@ -567,26 +632,26 @@ export default function MatchingQuestionPlayer({
           </DndContext>
 
           {/* Hướng dẫn */}
-        <Box
+          <Box
             sx={{
-            mb: 1.5,
-            mt: 1,
-            px: 1.2,
-            py: 0.8,
-            borderRadius: 2,
-            bgcolor: "#eff6ff",
-            border: "1px solid #bfdbfe",
+              mb: 1.5,
+              mt: 1,
+              px: 1.2,
+              py: 0.8,
+              borderRadius: 2,
+              bgcolor: "#eff6ff",
+              border: "1px solid #bfdbfe",
             }}
-        >
+          >
             <Typography
-            fontSize={12}
-            fontWeight={600}
-            color="#1d4ed8"
+              fontSize={12}
+              fontWeight={600}
+              color="#1d4ed8"
             >
-            Chọn một thẻ ở cột A rồi chọn thẻ tương ứng ở cột B.
-            Có thể kéo thả thẻ ở cột B trên máy tính.
+              Chọn một thẻ ở cột A rồi chọn thẻ tương ứng ở cột B.
+              Có thể kéo thả thẻ ở cột B trên máy tính.
             </Typography>
-        </Box>
+          </Box>
 
           {/* Trạng thái ghép đôi */}
           <Box

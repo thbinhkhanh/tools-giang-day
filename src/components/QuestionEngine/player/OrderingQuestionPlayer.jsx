@@ -159,22 +159,29 @@ export default function OrderingQuestionPlayer({
   disabled = false,
   result = null,
 }) {
-  const options = question?.options || [];
+  const options = Array.isArray(question?.options)
+    ? question.options
+    : [];
 
-  // Tạo thứ tự mặc định
-  const createDefaultOrder = () =>
-    options.map((_, index) => index);
+    // Chỉ lấy những phương án có nội dung
+    const availableIndexes = options
+    .map((item, index) =>
+        String(item ?? "").trim() ? index : -1
+    )
+    .filter((index) => index >= 0);
 
-  // Kiểm tra mảng thứ tự hợp lệ
-  const isValidOrder = (value) =>
+    const availableKey = availableIndexes.join(",");
+
+    // Tạo thứ tự mặc định theo chỉ số gốc
+    const createDefaultOrder = () => [...availableIndexes];
+
+    // Kiểm tra mảng thứ tự hợp lệ
+    const isValidOrder = (value) =>
     Array.isArray(value) &&
-    value.length === options.length &&
-    new Set(value).size === options.length &&
-    value.every(
-      (item) =>
-        Number.isInteger(item) &&
-        item >= 0 &&
-        item < options.length
+    value.length === availableIndexes.length &&
+    new Set(value).size === availableIndexes.length &&
+    value.every((item) =>
+        availableIndexes.includes(item)
     );
 
   const [order, setOrder] = useState(() =>
@@ -186,11 +193,11 @@ export default function OrderingQuestionPlayer({
   // Đồng bộ thứ tự khi câu hỏi hoặc đáp án thay đổi
   useEffect(() => {
     setOrder(
-      isValidOrder(answer)
+        isValidOrder(answer)
         ? answer
         : createDefaultOrder()
     );
-  }, [question, answer, options.length]);
+  }, [question, answer, availableKey]);
 
   // Cấu hình cảm ứng và kéo thả
   const sensors = useSensors(

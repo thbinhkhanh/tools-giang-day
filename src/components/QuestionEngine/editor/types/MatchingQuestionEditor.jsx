@@ -86,13 +86,18 @@ export default function MatchingQuestionEditor({ question, onChange }) {
       ))}
 
       <Button
-        variant="outlined"
-        startIcon={<AddRoundedIcon />}
-        onClick={addPair}
-        sx={{ mt: 0.5, borderRadius: 2, fontWeight: 800 }}
-      >
-        Thêm cặp
-      </Button>
+  variant="outlined"
+  startIcon={<AddRoundedIcon />}
+  onClick={addPair}
+  sx={{
+    mt: 0.5,
+    borderRadius: 2,
+    fontWeight: 800,
+    textTransform: "none",
+  }}
+>
+  Thêm cặp
+</Button>
     </Box>
   );
 }

@@ -198,7 +198,7 @@ export default function QuestionPlayer({
                 mt: 1.5,
                 p: 1.25,
                 borderRadius: 1.5,
-                bgcolor: result ? "#E8F5E9" : "#FFF3E0",
+                bgcolor: result ? "#44844a" : "#FFF3E0",
                 border: "1px solid",
                 borderColor: result ? "#81C784" : "#FFCC80",
             }}

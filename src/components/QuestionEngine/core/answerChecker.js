@@ -45,17 +45,47 @@ export const checkAnswer = (rawQuestion, answer) => {
         )
       );
 
+   
     // 5. Điền từ hoặc đáp án
     case "fill_blank": {
-      const userAnswer = normalizeAnswerText(answer);
+      // Danh sách đáp án đúng của từng chỗ trống
+      const blankAnswerSets = [
+        question.acceptedAnswers || [],
+        ...(question.blanks || []).map(
+          (blank) => blank.acceptedAnswers || []
+        ),
+      ];
 
-      if (!userAnswer) return false;
+      // Chuẩn hóa câu trả lời người học thành mảng
+      const userAnswers = Array.isArray(answer)
+        ? answer
+        : [answer];
 
-      return question.acceptedAnswers.some(
-        (accepted) =>
-          normalizeAnswerText(accepted) === userAnswer
-      );
+      // Phải điền đủ tất cả các chỗ trống
+      if (
+        userAnswers.length !== blankAnswerSets.length ||
+        blankAnswerSets.length === 0
+      ) {
+        return false;
+      }
+
+      // Kiểm tra từng chỗ trống
+      return blankAnswerSets.every((acceptedAnswers, index) => {
+        const userAnswer = normalizeAnswerText(
+          userAnswers[index] ?? ""
+        );
+
+        if (!userAnswer || !Array.isArray(acceptedAnswers)) {
+          return false;
+        }
+
+        return acceptedAnswers.some(
+          (accepted) =>
+            normalizeAnswerText(accepted) === userAnswer
+        );
+      });
     }
+
 
     // 6. Nối cặp
     

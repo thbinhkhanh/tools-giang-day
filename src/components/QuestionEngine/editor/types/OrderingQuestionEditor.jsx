@@ -5,34 +5,88 @@ import {
   TextField,
   Typography,
   MenuItem,
+  Button,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+
 export default function OrderingQuestionEditor({ question, onChange }) {
-  const filledIndexes = question.options
-    .map((item, index) => item.trim() ? index : -1)
+  const options = Array.isArray(question.options)
+    ? question.options
+    : [];
+
+  const order = Array.isArray(question.correctOrder)
+    ? question.correctOrder
+    : [];
+
+  // Các mục đã nhập nội dung
+  const filledIndexes = options
+    .map((item, index) =>
+      String(item ?? "").trim() ? index : -1
+    )
     .filter((index) => index >= 0);
 
-  const order = question.correctOrder || [];
-
+  // Cập nhật nội dung phương án
   const updateOption = (index, value) => {
-    const options = [...question.options];
-    options[index] = value;
+    const nextOptions = [...options];
+    nextOptions[index] = value;
 
-    // Bỏ các mục đã xóa khỏi thứ tự
+    // Bỏ mục không còn nội dung khỏi thứ tự
     const correctOrder = order.filter(
-      (item) => options[item]?.trim()
+      (item) =>
+        nextOptions[item] !== undefined &&
+        String(nextOptions[item]).trim()
     );
 
-    onChange({ ...question, options, correctOrder });
+    onChange({
+      ...question,
+      options: nextOptions,
+      correctOrder,
+    });
   };
 
+  // Thêm phương án
+  const addOption = () => {
+    if (options.length >= 26) return;
+
+    onChange({
+      ...question,
+      options: [...options, ""],
+    });
+  };
+
+  // Xóa phương án và điều chỉnh lại chỉ số trong correctOrder
+  const removeOption = (index) => {
+    if (options.length <= 2) return;
+
+    const nextOptions = options.filter(
+      (_, i) => i !== index
+    );
+
+    const correctOrder = order
+      .filter((item) => item !== index)
+      .map((item) => (item > index ? item - 1 : item));
+
+    onChange({
+      ...question,
+      options: nextOptions,
+      correctOrder,
+    });
+  };
+
+  // Cập nhật vị trí đúng
   const updatePosition = (index, position) => {
-    const currentOrder = filledIndexes.includes(index)
-      ? [...order.filter((item) => filledIndexes.includes(item))]
-      : [...filledIndexes];
+    const currentOrder = order.filter((item) =>
+      filledIndexes.includes(item)
+    );
 
     const baseOrder = [
-      ...filledIndexes.filter((item) => !currentOrder.includes(item)),
+      ...filledIndexes.filter(
+        (item) => !currentOrder.includes(item)
+      ),
       ...currentOrder,
     ];
 
@@ -42,9 +96,13 @@ export default function OrderingQuestionEditor({ question, onChange }) {
     baseOrder.splice(oldPosition, 1);
     baseOrder.splice(position, 0, index);
 
-    onChange({ ...question, correctOrder: baseOrder });
+    onChange({
+      ...question,
+      correctOrder: baseOrder,
+    });
   };
 
+  // Thứ tự hiển thị
   const displayOrder = [
     ...order.filter((item) => filledIndexes.includes(item)),
     ...filledIndexes.filter((item) => !order.includes(item)),
@@ -56,7 +114,7 @@ export default function OrderingQuestionEditor({ question, onChange }) {
         Nhập từng nội dung, sau đó chọn thứ tự đúng từ 1 đến số mục đã nhập.
       </Typography>
 
-      {question.options.map((option, index) => {
+      {options.map((option, index) => {
         const position = displayOrder.indexOf(index);
 
         return (
@@ -86,8 +144,12 @@ export default function OrderingQuestionEditor({ question, onChange }) {
               fullWidth
               size="small"
               value={option}
-              placeholder={`Nhập nội dung ${String.fromCharCode(65 + index)}`}
-              onChange={(e) => updateOption(index, e.target.value)}
+              placeholder={`Nhập nội dung ${String.fromCharCode(
+                65 + index
+              )}`}
+              onChange={(e) =>
+                updateOption(index, e.target.value)
+              }
             />
 
             {/* Chọn thứ tự */}
@@ -96,9 +158,12 @@ export default function OrderingQuestionEditor({ question, onChange }) {
               size="small"
               label="Thứ tự"
               value={position >= 0 ? position + 1 : ""}
-              disabled={!option.trim()}
+              disabled={!String(option ?? "").trim()}
               onChange={(e) =>
-                updatePosition(index, Number(e.target.value) - 1)
+                updatePosition(
+                  index,
+                  Number(e.target.value) - 1
+                )
               }
               sx={{ width: 115, flexShrink: 0 }}
             >
@@ -108,9 +173,41 @@ export default function OrderingQuestionEditor({ question, onChange }) {
                 </MenuItem>
               ))}
             </TextField>
+
+            {/* Xóa phương án */}
+            <Tooltip title="Xóa phương án">
+              <span>
+                <IconButton
+                  size="small"
+                  color="error"
+                  disabled={options.length <= 2}
+                  onClick={() => removeOption(index)}
+                  sx={{ flexShrink: 0 }}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
         );
       })}
+
+      {/* Thêm phương án */}
+      <Button
+        size="small"
+        variant="outlined"
+        startIcon={<AddIcon />}
+        onClick={addOption}
+        disabled={options.length >= 26}
+        sx={{
+            mt: 0.5,
+            textTransform: "none",
+            fontWeight: 700,
+            borderRadius: 2,
+        }}
+        >
+        Thêm đáp án
+        </Button>
     </Box>
   );
 }
