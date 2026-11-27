@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 
 import {
   FormControl,
@@ -600,7 +601,7 @@ export default function QuestionEditorDialog({
         {/* HEADER */}
 
         <DialogHeader
-          title="SOẠN ĐỀ THI"
+          title="SOẠN ĐỀ - ĐẤU TRƯỜNG KIẾN THỨC"
           subtitle="Quản lý câu hỏi và đáp án"
           icon={<EditNoteRoundedIcon />}
           onClose={onClose}
@@ -644,15 +645,13 @@ export default function QuestionEditorDialog({
                 p: 2,
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 900,
-                  color: "#172554",
-                  mb: 1.5,
-                }}
+               <Typography
+                fontWeight={800}
+                fontSize={14}
+                color="#075985"
+                mb={1.3}
               >
-                THÔNG TIN ĐỀ THI
+                THÔNG TIN ĐỀ
               </Typography>
 
               <Stack
@@ -851,23 +850,15 @@ export default function QuestionEditorDialog({
 
         <DialogActions
           sx={{
-            p: { xs: 1.5, sm: 2 },
+            px: 2,
+            py: 1,
             borderTop: "1px solid #e2e8f0",
+            minHeight: "unset",
             flexShrink: 0,
-            justifyContent: "space-between",
+            justifyContent: "center",
             bgcolor: "#fff",
           }}
         >
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#64748b",
-            }}
-          >
-            {validCount} câu có thể đưa vào cuộc thi
-          </Typography>
-
           <Button
             onClick={handleApply}
             disabled={
@@ -884,20 +875,19 @@ export default function QuestionEditorDialog({
             variant="contained"
             startIcon={
               saving ? (
-                <CircularProgress
-                  size={17}
-                  color="inherit"
-                />
-              ) : null
+                <CircularProgress size={17} color="inherit" />
+              ) : (
+                <SaveRoundedIcon />
+              )
             }
             sx={{
               ...primaryButtonSx,
-              minHeight: 42,
+              minHeight: 40,
               px: 2.5,
               fontSize: 14,
             }}
           >
-            {saving ? "Đang lưu..." : "Lưu đề thi"}
+            {saving ? "Đang lưu..." : "Lưu câu hỏi"}
           </Button>
         </DialogActions>
       </Dialog>

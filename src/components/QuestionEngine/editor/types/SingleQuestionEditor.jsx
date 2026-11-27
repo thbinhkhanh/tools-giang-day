@@ -5,6 +5,7 @@ import {
   TextField,
   Checkbox,
   Tooltip,
+  Typography,
 } from "@mui/material";
 
 export default function SingleQuestionEditor({ question, onChange }) {
@@ -27,14 +28,30 @@ export default function SingleQuestionEditor({ question, onChange }) {
             gap={1}
             mb={1.2}
           >
+            {/* Ký hiệu phương án A, B, C... */}
+            <Typography
+              sx={{
+                width: 28,
+                minWidth: 28,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#334155",
+                textAlign: "center",
+              }}
+            >
+              {String.fromCharCode(65 + index)}.
+            </Typography>
+
+            {/* Nội dung phương án */}
             <TextField
               fullWidth
               size="small"
-              label={`Phương án ${String.fromCharCode(65 + index)}`}
               value={option}
               onChange={(e) => updateOption(index, e.target.value)}
+              placeholder={`Nhập phương án ${String.fromCharCode(65 + index)}`}
             />
 
+            {/* Chọn đáp án đúng */}
             <Tooltip
               title={
                 selected

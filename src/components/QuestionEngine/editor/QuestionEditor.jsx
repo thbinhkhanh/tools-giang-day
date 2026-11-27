@@ -51,7 +51,7 @@ const EDITOR_COMPONENTS = {
 export default function QuestionEditor({
   questions,
   onChange,
-  title = "NGÂN HÀNG CÂU HỎI",
+  title = "BỘ CÂU HỎI",
   readOnly = false,
   minQuestions = 1,
   maxQuestions = Infinity,
@@ -158,34 +158,52 @@ export default function QuestionEditor({
   return (
     <Box>
       {/* TIÊU ĐỀ */}
-      <Box
+        <Box
         display="flex"
         alignItems="center"
         justifyContent="space-between"
+        flexWrap="wrap"
         gap={1}
         mb={2}
-      >
-        <Box>
-          <Typography
-            fontSize={17}
+        >
+        <Typography
+            fontSize={14}
             fontWeight={900}
             color="#1e3a8a"
-          >
+        >
             {title}
-          </Typography>
+        </Typography>
 
-          <Typography fontSize={12} color="text.secondary">
-            Tạo và quản lý câu hỏi theo 6 dạng khác nhau
-          </Typography>
+        <Box
+            display="flex"
+            alignItems="center"
+            gap={1}
+        >
+            <Chip
+            label={`${draftQuestions.length} câu hỏi`}
+            color="primary"
+            variant="outlined"
+            sx={{ fontWeight: 800 }}
+            />
+
+            {!readOnly && (
+            <Button
+                size="small"
+                variant="contained"
+                startIcon={<AddRoundedIcon />}
+                disabled={draftQuestions.length >= maxQuestions}
+                onClick={handleAddQuestion}
+                sx={{
+                borderRadius: 2,
+                fontWeight: 800,
+                whiteSpace: "nowrap",
+                }}
+            >
+                Thêm câu
+            </Button>
+            )}
         </Box>
-
-        <Chip
-          label={`${draftQuestions.length} câu hỏi`}
-          color="primary"
-          variant="outlined"
-          sx={{ fontWeight: 800 }}
-        />
-      </Box>
+    </Box>
 
       {/* DANH SÁCH CÂU HỎI */}
       <Paper
@@ -205,22 +223,9 @@ export default function QuestionEditor({
           gap={1}
           mb={1.2}
         >
-          <Typography fontSize={13} fontWeight={900}>
+          {/*<Typography fontSize={13} fontWeight={900}>
             DANH SÁCH CÂU HỎI
-          </Typography>
-
-          {!readOnly && (
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<AddRoundedIcon />}
-              disabled={draftQuestions.length >= maxQuestions}
-              onClick={handleAddQuestion}
-              sx={{ borderRadius: 2, fontWeight: 800 }}
-            >
-              Thêm câu
-            </Button>
-          )}
+          </Typography>*/}
         </Box>
 
         <Box display="flex" flexWrap="wrap" gap={0.8}>
@@ -389,44 +394,58 @@ export default function QuestionEditor({
 
         {/* ĐIỀU HƯỚNG */}
         <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="space-between"
-          gap={1}
-        >
-          <Button
-            variant="outlined"
-            disabled={currentIndex === 0}
-            onClick={() =>
-              setCurrentIndex((prev) => prev - 1)
-            }
-            startIcon={<ArrowBackIosNewRoundedIcon />}
-            sx={{ borderRadius: 2, fontWeight: 800 }}
-          >
-            Câu trước
-          </Button>
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+            gap={1}
+            >
+            <Button
+                variant="outlined"
+                disabled={currentIndex === 0}
+                onClick={() =>
+                setCurrentIndex((prev) => prev - 1)
+                }
+                startIcon={<ArrowBackIosNewRoundedIcon sx={{ fontSize: 15 }} />}
+                sx={{
+                borderRadius: 2,
+                fontWeight: 800,
+                fontSize: 13,
+                px: 1.5,
+                py: 0.65,
+                minHeight: 34,
+                }}
+            >
+                Câu trước
+            </Button>
 
-          <Typography
-            fontSize={12}
-            fontWeight={900}
-            color="text.secondary"
-            whiteSpace="nowrap"
-          >
-            {currentIndex + 1}/{draftQuestions.length}
-          </Typography>
+            <Typography
+                fontSize={12}
+                fontWeight={900}
+                color="text.secondary"
+                whiteSpace="nowrap"
+            >
+                {currentIndex + 1}/{draftQuestions.length}
+            </Typography>
 
-          <Button
-            variant="contained"
-            disabled={currentIndex === draftQuestions.length - 1}
-            onClick={() =>
-              setCurrentIndex((prev) => prev + 1)
-            }
-            endIcon={<ArrowForwardIosRoundedIcon />}
-            sx={{ borderRadius: 2, fontWeight: 800 }}
-          >
-            Câu tiếp
-          </Button>
-        </Box>
+            <Button
+                variant="contained"
+                disabled={currentIndex === draftQuestions.length - 1}
+                onClick={() =>
+                setCurrentIndex((prev) => prev + 1)
+                }
+                endIcon={<ArrowForwardIosRoundedIcon sx={{ fontSize: 15 }} />}
+                sx={{
+                borderRadius: 2,
+                fontWeight: 800,
+                fontSize: 13,
+                px: 1.5,
+                py: 0.65,
+                minHeight: 34,
+                }}
+            >
+                Câu tiếp
+            </Button>
+            </Box>
 
         {/* XEM TRƯỚC */}
         {!readOnly && (

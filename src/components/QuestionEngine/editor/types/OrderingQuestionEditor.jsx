@@ -5,7 +5,6 @@ import {
   TextField,
   Typography,
   MenuItem,
-  Alert,
 } from "@mui/material";
 
 export default function OrderingQuestionEditor({ question, onChange }) {
@@ -32,7 +31,6 @@ export default function OrderingQuestionEditor({ question, onChange }) {
       ? [...order.filter((item) => filledIndexes.includes(item))]
       : [...filledIndexes];
 
-    // Nếu chưa có thứ tự thì khởi tạo theo thứ tự nhập
     const baseOrder = [
       ...filledIndexes.filter((item) => !currentOrder.includes(item)),
       ...currentOrder,
@@ -69,14 +67,30 @@ export default function OrderingQuestionEditor({ question, onChange }) {
             gap={1}
             mb={1.2}
           >
+            {/* Ký hiệu A, B, C... */}
+            <Typography
+              sx={{
+                width: 28,
+                minWidth: 28,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#334155",
+                textAlign: "center",
+              }}
+            >
+              {String.fromCharCode(65 + index)}.
+            </Typography>
+
+            {/* Nội dung */}
             <TextField
               fullWidth
               size="small"
-              label={`Nội dung ${String.fromCharCode(65 + index)}`}
               value={option}
+              placeholder={`Nhập nội dung ${String.fromCharCode(65 + index)}`}
               onChange={(e) => updateOption(index, e.target.value)}
             />
 
+            {/* Chọn thứ tự */}
             <TextField
               select
               size="small"

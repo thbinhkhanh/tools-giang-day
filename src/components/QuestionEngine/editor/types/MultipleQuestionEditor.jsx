@@ -5,7 +5,7 @@ import {
   TextField,
   Checkbox,
   Tooltip,
-  Alert,
+  Typography,
 } from "@mui/material";
 
 export default function MultipleQuestionEditor({ question, onChange }) {
@@ -32,67 +32,83 @@ export default function MultipleQuestionEditor({ question, onChange }) {
         const selected = (question.correctIndexes || []).includes(index);
 
         return (
-          <Box
+        <Box
             key={index}
             display="flex"
             alignItems="center"
             gap={1}
             mb={1.2}
-          >
+        >
+            {/* Ký hiệu phương án A, B, C... */}
+            <Typography
+            sx={{
+                width: 28,
+                minWidth: 28,
+                fontSize: 14,
+                fontWeight: 700,
+                color: "#334155",
+                textAlign: "center",
+            }}
+            >
+            {String.fromCharCode(65 + index)}.
+            </Typography>
+
+            {/* Nội dung phương án */}
             <TextField
-              fullWidth
-              size="small"
-              label={`Phương án ${String.fromCharCode(65 + index)}`}
-              value={option}
-              onChange={(e) => updateOption(index, e.target.value)}
+            fullWidth
+            size="small"
+            value={option}
+            onChange={(e) => updateOption(index, e.target.value)}
+            placeholder={`Nhập phương án ${String.fromCharCode(65 + index)}`}
             />
 
+            {/* Chọn đáp án đúng */}
             <Tooltip
-              title={
+            title={
                 selected
-                  ? "Đáp án đúng – nhấn để bỏ chọn"
-                  : "Chọn làm đáp án đúng"
-              }
+                ? "Đáp án đúng – nhấn để bỏ chọn"
+                : "Chọn làm đáp án đúng"
+            }
             >
-              <Checkbox
+            <Checkbox
                 checked={selected}
                 onChange={() => toggleCorrect(index)}
                 icon={
-                  <Box
+                <Box
                     sx={{
-                      width: 22,
-                      height: 22,
-                      border: "2px solid #94a3b8",
-                      borderRadius: 1,
-                      bgcolor: "#fff",
+                    width: 22,
+                    height: 22,
+                    border: "2px solid #94a3b8",
+                    borderRadius: 1,
+                    bgcolor: "#fff",
                     }}
-                  />
+                />
                 }
                 checkedIcon={
-                  <Box
+                <Box
                     sx={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: 1,
-                      bgcolor: "#16a34a",
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 17,
-                      fontWeight: 900,
+                    width: 22,
+                    height: 22,
+                    borderRadius: 1,
+                    bgcolor: "#16a34a",
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 17,
+                    fontWeight: 900,
                     }}
-                  >
+                >
                     ✓
-                  </Box>
+                </Box>
                 }
                 sx={{
-                  p: 0.8,
-                  flexShrink: 0,
+                p: 0.8,
+                flexShrink: 0,
                 }}
-              />
+            />
             </Tooltip>
-          </Box>
+        </Box>
         );
       })}
     </Box>

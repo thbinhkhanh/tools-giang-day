@@ -91,14 +91,49 @@ const getCorrectAnswerText = (question) => {
     }
 
     case "multiple": {
-      const indexes = Array.isArray(question.correctIndexes)
-        ? question.correctIndexes
+      const selectedIndexes = Array.isArray(answer)
+        ? answer
         : [];
 
-      return indexes
-        .map((index) => options[Number(index)])
-        .filter(Boolean)
-        .join(", ");
+      return options.map((option, index) => {
+        const selected = selectedIndexes.includes(index);
+
+        return (
+          <Paper
+            key={index}
+            variant="outlined"
+            sx={{
+              mb: 1,
+              borderRadius: 2,
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={selected}
+                  onChange={() =>
+                    setAnswer((prev) => {
+                      const current = Array.isArray(prev)
+                        ? prev
+                        : [];
+
+                      return current.includes(index)
+                        ? current.filter((i) => i !== index)
+                        : [...current, index];
+                    })
+                  }
+                />
+              }
+              label={`${String.fromCharCode(65 + index)}. ${option}`}
+              sx={{
+                mx: 0.5,
+                width: "100%",
+                py: 0.5,
+              }}
+            />
+          </Paper>
+        );
+      });
     }
 
     case "true_false":

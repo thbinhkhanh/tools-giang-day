@@ -1,5 +1,6 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+
 import {
   Dialog,
   DialogContent,
@@ -14,7 +15,7 @@ import {
   LinearProgress,
   Tooltip,
 } from "@mui/material";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
 import CloseIcon from "@mui/icons-material/Close";
@@ -27,10 +28,12 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import TreasureMapIllustration from "../components/TreasureMapIllustration";
 import TreasureMapConfigDialog from "../dialog/TreasureMapConfigDialog";
 import SettingsIcon from "@mui/icons-material/Settings";
+import TreasureMapQuestionDialog from "../dialog/TreasureMapQuestionDialog";
+
 
 import {
   QuestionPlayer,
-  createEmptyAnswer,
+  QuestionEditor,
 } from "../components/QuestionEngine";
 
 const MAP_THEMES = {
@@ -279,6 +282,7 @@ export default function TreasureMapGame({
   onClose,
   initialStageCount = 4,
   initialMode = "teacher",
+  onOpenQuestionEditor,
 }) {
   
   // Lấy cấu hình lớp và môn học
@@ -385,8 +389,9 @@ useEffect(() => {
     };
   }, [open]);
 
-  const [themeId, setThemeId] = useState("tropical");
+  const [configLoaded, setConfigLoaded] = useState(false);
 
+  const [themeId, setThemeId] = useState("tropical");
   const [stageCount, setStageCount] = useState(
     Math.min(8, Math.max(3, initialStageCount))
   );
@@ -411,6 +416,7 @@ useEffect(() => {
   const [inspectedStage, setInspectedStage] = useState(null);
 
   const [configOpen, setConfigOpen] = useState(false);
+  const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
 
   // Trạng thái tải câu hỏi từ Firestore
   const [loadedQuestions, setLoadedQuestions] = useState([]);
@@ -423,6 +429,8 @@ useEffect(() => {
   const theme = MAP_THEMES[themeId] || MAP_THEMES.tropical;
   const totalSteps = stages.length;
   const currentStage = stages[stepIndex] || stages[0];
+
+  
 
   const confettiPieces = useMemo(
     () => buildConfettiPieces(64),
@@ -442,6 +450,119 @@ useEffect(() => {
     grade && subject && weekNumber
       ? `quiz_${className}_${subject}_${weekNumber}`
       : "";
+  
+  // ====================================================
+  // TẢI CẤU HÌNH BẢN ĐỒ TỪ FIRESTORE
+  // USERS/{username}.treasureMapConfig
+  // ====================================================
+
+  useEffect(() => {
+    if (!open) {
+      setConfigLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTreasureMapConfig = async () => {
+      setConfigLoaded(false);
+
+      try {
+        const currentUser = JSON.parse(
+          localStorage.getItem("tools_user") || "null"
+        );
+
+        const username = String(
+          currentUser?.username || ""
+        ).trim().toLowerCase();
+
+        if (!username) {
+          throw new Error("Không xác định được tài khoản đăng nhập.");
+        }
+
+        const userRef = doc(db, "USERS", username);
+        const userSnap = await getDoc(userRef);
+
+        if (cancelled) return;
+
+        const savedConfig = userSnap.exists()
+          ? userSnap.data().treasureMapConfig || {}
+          : {};
+
+        // Kiểm tra và chuẩn hóa cấu hình
+        const nextThemeId = MAP_THEMES[savedConfig.themeId]
+          ? savedConfig.themeId
+          : "tropical";
+
+        const nextStageCount = Math.min(
+          8,
+          Math.max(
+            3,
+            Number(savedConfig.stageCount) ||
+              Number(initialStageCount) ||
+              4
+          )
+        );
+
+        const nextMode = ["teacher", "quiz"].includes(
+          savedConfig.mode
+        )
+          ? savedConfig.mode
+          : initialMode;
+
+        // Cập nhật giao diện theo cấu hình đã lưu
+        setThemeId(nextThemeId);
+        setStageCount(nextStageCount);
+        setMode(nextMode);
+
+        // Dựng bản đồ ban đầu
+        const nextStages = buildStages(
+          nextThemeId,
+          nextStageCount
+        );
+
+        setStages(nextStages);
+        resetProgress(nextStages);
+
+        setLoadedQuestions([]);
+        setQuestionLoadError("");
+
+      } catch (error) {
+        console.error("Lỗi tải cấu hình bản đồ:", error);
+
+        if (!cancelled) {
+          // Dùng cấu hình mặc định nếu không tải được
+          const nextCount = Math.min(
+            8,
+            Math.max(3, Number(initialStageCount) || 4)
+          );
+
+          const nextMode = ["teacher", "quiz"].includes(initialMode)
+            ? initialMode
+            : "teacher";
+
+          setThemeId("tropical");
+          setStageCount(nextCount);
+          setMode(nextMode);
+
+          const nextStages = buildStages("tropical", nextCount);
+
+          setStages(nextStages);
+          resetProgress(nextStages);
+        }
+      } finally {
+        if (!cancelled) {
+          setConfigLoaded(true);
+        }
+      }
+    };
+
+    loadTreasureMapConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const getAudioContext = () => {
     try {
@@ -612,7 +733,14 @@ useEffect(() => {
   // Tải câu hỏi từ Firestore khi chọn chế độ HS
   
   useEffect(() => {
-    if (!open || mode !== "quiz" || !selectedClass) return;
+    if (
+      !open ||
+      !configLoaded ||
+      mode !== "quiz" ||
+      !selectedClass
+    ) {
+      return;
+    }
 
     if (!weekNumber) {
       setLoadedQuestions([]);
@@ -850,6 +978,7 @@ useEffect(() => {
     };
   }, [
     open,
+    configLoaded,
     mode,
     documentId,
     grade,
@@ -992,45 +1121,43 @@ useEffect(() => {
     setConfigOpen(true);
   };
 
+  const handleOpenQuestionEditor = () => {
+    setQuestionDialogOpen(true);
+  };
+
   const handleApplyConfig = ({
-    themeId,
-    stageCount,
-    mode,
-    questions,
+    themeId: nextThemeId,
+    stageCount: nextStageCount,
+    mode: nextMode,
   }) => {
     const nextCount = Math.min(
       8,
-      Math.max(3, stageCount)
+      Math.max(3, Number(nextStageCount) || 4)
     );
 
-    setThemeId(themeId);
+    setThemeId(nextThemeId);
     setStageCount(nextCount);
-    setMode(mode);
+    setMode(nextMode);
 
-    // Chế độ GV giữ nguyên cách tạo chặng.
-    // Chế độ HS sẽ được nạp câu hỏi từ Firestore.
-    if (mode === "teacher") {
+    // Chỉ cập nhật lại các chặng khi số chặng hoặc bản đồ thay đổi
+    if (
+      nextThemeId !== themeId ||
+      nextCount !== stageCount
+    ) {
       const nextStages = buildStages(
-        themeId,
-        nextCount
-      );
-
-      setStages(nextStages);
-      resetProgress(nextStages);
-    } else {
-      const nextStages = buildStages(
-        themeId,
+        nextThemeId,
         nextCount,
-        []
+        nextMode === "quiz" ? [] : undefined
       );
 
       setStages(nextStages);
-      setLoadedQuestions([]);
-      setQuestionLoadError("");
       resetProgress(nextStages);
-    }
 
-    setConfigOpen(false);
+      if (nextMode === "quiz") {
+        setLoadedQuestions([]);
+        setQuestionLoadError("");
+      }
+    }
   };
 
   const progressPct = completed
@@ -1296,26 +1423,54 @@ return (
             </Typography>
           </Box>
 
-          <Chip
-            label="Cấu hình trò chơi"
-            onClick={handleOpenConfig}
-            size="small"
+          <Box
             sx={{
               gridColumn: { xs: 2, sm: 3 },
               gridRow: { xs: 2, sm: 1 },
-              justifySelf: "start",
-              height: 30,
-              color: "#fff",
-              bgcolor: "rgba(255,255,255,.10)",
-              border: "1px solid rgba(255,255,255,.2)",
-              fontWeight: 600,
-              fontSize: 12,
-              cursor: "pointer",
-              "&:hover": {
-                bgcolor: "rgba(255,255,255,.2)",
-              },
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
             }}
-          />
+          >
+            <Chip
+              icon={<SettingsIcon sx={{ color: "#fff !important", fontSize: 16 }} />}
+              label="Cấu hình"
+              onClick={handleOpenConfig}
+              size="small"
+              sx={{
+                height: 30,
+                color: "#fff",
+                bgcolor: "rgba(255,255,255,.10)",
+                border: "1px solid rgba(255,255,255,.2)",
+                fontWeight: 600,
+                fontSize: 12,
+                cursor: "pointer",
+                "&:hover": {
+                  bgcolor: "rgba(255,255,255,.2)",
+                },
+              }}
+            />
+
+            <Chip
+              icon={<EditIcon sx={{ color: "#fff !important", fontSize: 16 }} />}
+              label="Soạn đề"
+              onClick={handleOpenQuestionEditor}
+              size="small"
+              sx={{
+                height: 30,
+                color: "#fff",
+                bgcolor: "rgba(255,255,255,.10)",
+                border: "1px solid rgba(255,255,255,.2)",
+                fontWeight: 600,
+                fontSize: 12,
+                cursor: "pointer",
+                "&:hover": {
+                  bgcolor: "rgba(255,255,255,.2)",
+                },
+              }}
+            />
+          </Box>
         </Box>
 
         <Box
@@ -1810,6 +1965,12 @@ return (
         pairs: stage.pairs || [],
       }))}
       onApply={handleApplyConfig}
+    />
+
+    <TreasureMapQuestionDialog
+      open={questionDialogOpen}
+      onClose={() => setQuestionDialogOpen(false)}
+      stageCount={stageCount}
     />
   </>
 );
