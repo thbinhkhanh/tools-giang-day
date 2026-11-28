@@ -505,6 +505,16 @@ const handleWeekChange = async (event) => {
           iconColor: "#0284C7",
           iconBg: "#E0F2FE",
         },
+        
+        {
+          id: "knowledge-arena",
+          title: "Đấu trường kiến thức",
+          description: "Thi trắc nghiệm, tính điểm và công bố kết quả",
+          icon: <SchoolRoundedIcon />,
+          iconColor: "#7C3AED",
+          iconBg: "#EDE9FE",
+        },
+
         {
           id: "leaderboard",
           title: "Bảng thi đua học tập",
@@ -513,13 +523,15 @@ const handleWeekChange = async (event) => {
           iconColor: "#D97706",
           iconBg: "#FEF3C7",
         },
+
         {
-          id: "knowledge-arena",
-          title: "Đấu trường kiến thức",
-          description: "Thi trắc nghiệm, tính điểm và công bố kết quả",
-          icon: <SchoolRoundedIcon />,
-          iconColor: "#7C3AED",
-          iconBg: "#EDE9FE",
+          id: "group-students",
+          title: "Chia nhóm học sinh",
+          description: "Tự động chia học sinh thành các nhóm",
+          icon: <GroupsRoundedIcon />,
+          iconColor: "#0891B2",
+          iconBg: "#CFFAFE",
+          needStudents: true,
         },
       ],
     },
@@ -552,15 +564,7 @@ const handleWeekChange = async (event) => {
           iconColor: "#4F46E5",
           iconBg: "#E0E7FF",
         },
-        {
-          id: "group-students",
-          title: "Chia nhóm học sinh",
-          description: "Tự động chia học sinh thành các nhóm",
-          icon: <GroupsRoundedIcon />,
-          iconColor: "#0891B2",
-          iconBg: "#CFFAFE",
-          needStudents: true,
-        },
+        
       ],
     },
   ];
