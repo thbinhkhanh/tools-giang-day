@@ -477,44 +477,25 @@ const handleWeekChange = async (event) => {
     },
 
     {
-      title: "TRÒ CHƠI HỌC TẬP",
+      title: "TRÒ CHƠI VÀ THI ĐUA",
       color: "#7C3AED",
       tools: [
         {
           id: "treasure-map",
           title: "Đi tìm kho báu",
-          description:
-            "Tổ chức trò chơi khám phá và chinh phục kho báu kiến thức",
+          description: "Khám phá và chinh phục kho báu kiến thức",
           icon: <AutoAwesomeIcon />,
           iconColor: "#7C3AED",
           iconBg: "#EDE9FE",
         },
         {
-          id: "question-draw",
-          title: "Bốc thăm câu hỏi",
-          description: "Nhập câu hỏi và chọn ngẫu nhiên",
-          icon: <QuizRoundedIcon />,
-          iconColor: "#7C3AED",
-          iconBg: "#EDE9FE",
-        },
-        {
-          id: "phieu-hoc-tap",
-          title: "Phiếu học tập",
-          description: "Tổ chức làm bài, chấm điểm và lưu kết quả học tập",
-          icon: <FactCheckRoundedIcon />,
-          iconColor: "#0284C7",
-          iconBg: "#E0F2FE",
-        },
-        
-        {
           id: "knowledge-arena",
           title: "Đấu trường kiến thức",
-          description: "Thi trắc nghiệm, tính điểm và công bố kết quả",
+          description: "Thi đấu kiến thức, tính điểm và xếp hạng",
           icon: <SchoolRoundedIcon />,
           iconColor: "#7C3AED",
           iconBg: "#EDE9FE",
         },
-
         {
           id: "leaderboard",
           title: "Bảng thi đua học tập",
@@ -523,7 +504,37 @@ const handleWeekChange = async (event) => {
           iconColor: "#D97706",
           iconBg: "#FEF3C7",
         },
+        {
+          id: "dice",
+          title: "Xúc xắc ngẫu nhiên",
+          description: "Tung xúc xắc để chọn số ngẫu nhiên",
+          icon: <CasinoRoundedIcon />,
+          iconColor: "#4F46E5",
+          iconBg: "#E0E7FF",
+        },
+      ],
+    },
 
+    {
+      title: "HỌC TẬP VÀ KIỂM TRA",
+      color: "#0284C7",
+      tools: [
+        {
+          id: "phieu-hoc-tap",
+          title: "Phiếu học tập",
+          description: "Giao bài, tổ chức làm bài và lưu kết quả",
+          icon: <FactCheckRoundedIcon />,
+          iconColor: "#0284C7",
+          iconBg: "#E0F2FE",
+        },
+        {
+          id: "question-draw",
+          title: "Bốc thăm câu hỏi",
+          description: "Chọn câu hỏi để kiểm tra và củng cố kiến thức",
+          icon: <QuizRoundedIcon />,
+          iconColor: "#0284C7",
+          iconBg: "#E0F2FE",
+        },
         {
           id: "group-students",
           title: "Chia nhóm học sinh",
@@ -537,7 +548,7 @@ const handleWeekChange = async (event) => {
     },
 
     {
-      title: "QUẢN LÝ HOẠT ĐỘNG",
+      title: "CÔNG CỤ HỖ TRỢ",
       color: "#00897b",
       tools: [
         {
@@ -556,15 +567,6 @@ const handleWeekChange = async (event) => {
           iconColor: "#0D9488",
           iconBg: "#CCFBF1",
         },
-        {
-          id: "dice",
-          title: "Xúc xắc ngẫu nhiên",
-          description: "Tung xúc xắc để chọn số ngẫu nhiên",
-          icon: <CasinoRoundedIcon />,
-          iconColor: "#4F46E5",
-          iconBg: "#E0E7FF",
-        },
-        
       ],
     },
   ];

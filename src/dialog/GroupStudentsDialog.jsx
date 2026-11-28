@@ -30,6 +30,7 @@ import ShuffleRoundedIcon from "@mui/icons-material/ShuffleRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 
+// XÁO TRỘN DANH SÁCH
 const shuffleArray = (array) => {
   const result = [...array];
 
@@ -44,6 +45,7 @@ const shuffleArray = (array) => {
 const getStudentName = (student) =>
   student?.hoVaTen || student?.ten || "Chưa có tên";
 
+// MÀU SẮC CÁC NHÓM
 const groupColors = [
   {
     main: "#2563EB",
@@ -86,74 +88,75 @@ export default function GroupStudentsDialog({
 }) {
   const { getUploadedStudents } = useContext(StudentContext);
 
-const [selectedClass, setSelectedClass] = useState(className);
-const [loadingStudents, setLoadingStudents] = useState(false);
+  const [selectedClass, setSelectedClass] = useState(className);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
-// Lấy lớp đang chọn từ Firestore
-useEffect(() => {
-  if (!open) return;
+  // LẤY LỚP ĐANG CHỌN TỪ FIRESTORE
+  useEffect(() => {
+    if (!open) return;
 
-  let cancelled = false;
+    let cancelled = false;
 
-  const loadSelectedClass = async () => {
-    try {
-      const currentUser = JSON.parse(
-        localStorage.getItem("tools_user") || "null"
-      );
-
-      const currentUsername = String(
-        username || currentUser?.username || ""
-      )
-        .trim()
-        .toLowerCase();
-
-      if (!currentUsername) {
-        setSelectedClass("");
-        return;
-      }
-
-      setLoadingStudents(true);
-
-      const userRef = doc(db, "USERS", currentUsername);
-      const userSnap = await getDoc(userRef);
-
-      if (cancelled) return;
-
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-
-        setSelectedClass(
-          String(userData.lopDangChon || "").trim()
+    const loadSelectedClass = async () => {
+      try {
+        const currentUser = JSON.parse(
+          localStorage.getItem("tools_user") || "null"
         );
-      } else {
-        setSelectedClass("");
+
+        const currentUsername = String(
+          username || currentUser?.username || ""
+        )
+          .trim()
+          .toLowerCase();
+
+        if (!currentUsername) {
+          setSelectedClass("");
+          return;
+        }
+
+        setLoadingStudents(true);
+
+        const userRef = doc(db, "USERS", currentUsername);
+        const userSnap = await getDoc(userRef);
+
+        if (cancelled) return;
+
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+
+          setSelectedClass(
+            String(userData.lopDangChon || "").trim()
+          );
+        } else {
+          setSelectedClass("");
+        }
+      } catch (error) {
+        console.error("Lỗi lấy lớp đang chọn:", error);
+
+        if (!cancelled) setSelectedClass("");
+      } finally {
+        if (!cancelled) setLoadingStudents(false);
       }
-    } catch (error) {
-      console.error("Lỗi lấy lớp đang chọn:", error);
-      if (!cancelled) setSelectedClass("");
-    } finally {
-      if (!cancelled) setLoadingStudents(false);
-    }
-  };
+    };
 
-  loadSelectedClass();
+    loadSelectedClass();
 
-  return () => {
-    cancelled = true;
-  };
-}, [open, username]);
+    return () => {
+      cancelled = true;
+    };
+  }, [open, username]);
 
-// Lấy học sinh theo lớp đang chọn
-const contextStudents =
-  username && selectedClass
-    ? getUploadedStudents(username, selectedClass)
-    : null;
+  // LẤY HỌC SINH THEO LỚP ĐANG CHỌN
+  const contextStudents =
+    username && selectedClass
+      ? getUploadedStudents(username, selectedClass)
+      : null;
 
-const students = Array.isArray(contextStudents)
-  ? contextStudents
-  : selectedClass === className
-    ? propStudents
-    : [];
+  const students = Array.isArray(contextStudents)
+    ? contextStudents
+    : selectedClass === className
+      ? propStudents
+      : [];
 
   const [groupCount, setGroupCount] = useState(4);
   const [groups, setGroups] = useState([]);
@@ -163,6 +166,7 @@ const students = Array.isArray(contextStudents)
     Math.min(12, students.length || 12)
   );
 
+  // CHIA NHÓM NGẪU NHIÊN
   const handleCreateGroups = () => {
     if (!students.length) return;
 
@@ -180,136 +184,139 @@ const students = Array.isArray(contextStudents)
     setGroups(result);
   };
 
+  // RESET KHI MỞ DIALOG
   useEffect(() => {
     if (open) {
       setGroups([]);
+
       setGroupCount((prev) =>
         Math.min(prev, maxGroups)
       );
     }
   }, [open, maxGroups]);
 
-  const handleClose = (event, reason) => {
-    // Không đóng khi bấm ra ngoài Dialog
-    if (reason === "backdropClick") return;
-
+  const handleClose = () => {
     onClose?.();
-    };
+  };
 
-  
-return (
-  <Dialog
-    open={open}
-    onClose={(event, reason) => {
-      if (
-        reason === "backdropClick" ||
-        reason === "escapeKeyDown"
-      ) {
-        return;
-      }
-      handleClose();
-    }}
-    disableEscapeKeyDown
-    fullWidth
-    maxWidth={false}
-    sx={{
-      "& .MuiDialog-container": {
-        alignItems: "center",
-      },
-      "& .MuiDialog-paper": {
-        margin: { xs: "8px", sm: "32px" },
-      },
-    }}
-    TransitionComponent={Fade}
-    PaperProps={{
-      sx: {
-        borderRadius: { xs: 4, sm: 4 },
-        overflow: "hidden",
-        background: "#fff",
-        boxShadow: "0 25px 80px rgba(15,23,42,.25)",
-        position: "relative",
+  return (
+    <Dialog
+      open={open}
+      onClose={(event, reason) => {
+        if (
+          reason === "backdropClick" ||
+          reason === "escapeKeyDown"
+        ) {
+          return;
+        }
 
-        width: {
-          xs: "calc(100vw - 16px)",
-          sm: "calc(100% - 64px)",
-        },
-        maxWidth: {
-          xs: "calc(100vw - 16px)",
-          sm: "900px",
-        },
-
-        height: { xs: "96%", sm: "94%" },
-        maxHeight: { xs: "96%", sm: "94%" },
-
-        display: "flex",
-        flexDirection: "column",
-      },
-    }}
-  >
-    {/* HEADER */}
-    <Box
+        handleClose();
+      }}
+      disableEscapeKeyDown
+      fullWidth
+      maxWidth={false}
       sx={{
-        px: 2.5,
-        py: 2,
-        color: "#fff",
-        background:
-          "linear-gradient(115deg, #101B3C 0%, #173B82 55%, #087DB5 100%)",
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
+        "& .MuiDialog-container": {
+          alignItems: "center",
+        },
+        "& .MuiDialog-paper": {
+          margin: { xs: "8px", sm: "32px" },
+        },
+      }}
+      TransitionComponent={Fade}
+      PaperProps={{
+        sx: {
+          borderRadius: { xs: 4, sm: 4 },
+          overflow: "hidden",
+          background: "#fff",
+          boxShadow: "0 25px 80px rgba(15,23,42,.25)",
+          position: "relative",
+
+          width: {
+            xs: "calc(100vw - 16px)",
+            sm: "calc(100% - 64px)",
+          },
+
+          maxWidth: {
+            xs: "calc(100vw - 16px)",
+            sm: "1100px",
+          },
+
+          height: { xs: "96%", sm: "94%" },
+          maxHeight: { xs: "96%", sm: "94%" },
+
+          display: "flex",
+          flexDirection: "column",
+        },
       }}
     >
+      {/* HEADER */}
       <Box
         sx={{
-          width: 44,
-          height: 44,
-          borderRadius: 2.5,
-          bgcolor: "rgba(56,189,248,0.18)",
-          border: "1px solid rgba(125,211,252,0.25)",
+          px: 2.5,
+          py: 2,
+          color: "#fff",
+          background:
+            "linear-gradient(115deg, #101B3C 0%, #173B82 55%, #087DB5 100%)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          gap: 1.5,
         }}
       >
-        <GroupsRoundedIcon sx={{ fontSize: 27, color: "#7DD3FC" }} />
+        <Box
+          sx={{
+            width: 44,
+            height: 44,
+            borderRadius: 2.5,
+            bgcolor: "rgba(56,189,248,0.18)",
+            border: "1px solid rgba(125,211,252,0.25)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <GroupsRoundedIcon
+            sx={{ fontSize: 27, color: "#7DD3FC" }}
+          />
+        </Box>
+
+        <Box flex={1}>
+          <Typography
+            fontWeight={900}
+            fontSize={18}
+            letterSpacing={0.3}
+          >
+            CHIA NHÓM HỌC SINH
+          </Typography>
+
+          <Typography
+            fontSize={12}
+            sx={{ opacity: 0.9 }}
+          >
+            Xáo trộn ngẫu nhiên và phân chia đồng đều
+          </Typography>
+        </Box>
+
+        <IconButton
+          onClick={handleClose}
+          sx={{
+            color: "#fff",
+            bgcolor: "rgba(56,189,248,0.16)",
+            "&:hover": {
+              bgcolor: "rgba(56,189,248,0.3)",
+            },
+          }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
       </Box>
 
-      <Box flex={1}>
-        <Typography
-          fontWeight={900}
-          fontSize={18}
-          letterSpacing={0.3}
-        >
-          CHIA NHÓM HỌC SINH
-        </Typography>
-
-        <Typography
-          fontSize={12}
-          sx={{ opacity: 0.9 }}
-        >
-          Xáo trộn ngẫu nhiên và phân chia đồng đều
-        </Typography>
-      </Box>
-
-      <IconButton
-        onClick={handleClose}
+      <DialogContent
         sx={{
-          color: "#fff",
-          bgcolor: "rgba(56,189,248,0.16)",
-          "&:hover": {
-            bgcolor: "rgba(56,189,248,0.3)",
-          },
-        }}
-      >
-        <CloseRoundedIcon />
-      </IconButton>
-    </Box>
-
-    <DialogContent
-      sx={{
           px: { xs: 1.5, sm: 3 },
           py: { xs: 1, sm: 1.5 },
-          background: "linear-gradient(180deg,#f8fbff 0%,#ffffff 100%)",
+          background:
+            "linear-gradient(180deg,#f8fbff 0%,#ffffff 100%)",
           display: "flex",
           flexDirection: "column",
           gap: { xs: 1, sm: 1.5 },
@@ -317,282 +324,302 @@ return (
           minHeight: 0,
           overflowY: "auto",
           overflowX: "hidden",
-      }}
-  >
-      {/* THÔNG TIN SĨ SỐ */}
-      <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-        <Grid container spacing={1} sx={{ mb: 1.5 }}>
-          {/* LỚP ĐANG CHỌN */}
-          <Grid item xs={4}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 1,
-                borderRadius: 2,
-                bgcolor: "#EFF6FF",
-                border: "1px solid #BFDBFE",
-                textAlign: "center",
-              }}
-            >
-              <GroupsRoundedIcon
-                sx={{ color: "#2563EB", fontSize: 21 }}
-              />
-
-              <Typography
-                fontSize={20}
-                fontWeight={900}
-                color="#1D4ED8"
-                lineHeight={1.2}
+        }}
+      >
+        {/* THÔNG TIN SĨ SỐ */}
+        <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+          <Grid container spacing={1} sx={{ mb: 1.5 }}>
+            {/* LỚP ĐANG CHỌN */}
+            <Grid item xs={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  textAlign: "center",
+                }}
               >
-                {selectedClass || "--"}
-              </Typography>
+                <GroupsRoundedIcon
+                  sx={{ color: "#2563EB", fontSize: 21 }}
+                />
 
-              <Typography
-                fontSize={9}
-                fontWeight={700}
-                color="#1D4ED8"
+                <Typography
+                  fontSize={20}
+                  fontWeight={900}
+                  color="#1D4ED8"
+                  lineHeight={1.2}
+                >
+                  {selectedClass || "--"}
+                </Typography>
+
+                <Typography
+                  fontSize={9}
+                  fontWeight={700}
+                  color="#1D4ED8"
+                >
+                  LỚP ĐANG CHỌN
+                </Typography>
+              </Paper>
+            </Grid>
+
+            {/* TỔNG SỐ HỌC SINH */}
+            <Grid item xs={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor: "#ECFDF5",
+                  border: "1px solid #A7F3D0",
+                  textAlign: "center",
+                }}
               >
-                LỚP ĐANG CHỌN
-              </Typography>
-            </Paper>
-          </Grid>
+                <GroupsRoundedIcon
+                  sx={{ color: "#059669", fontSize: 21 }}
+                />
 
-          {/* TỔNG SỐ HỌC SINH */}
-          <Grid item xs={4}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 1,
-                borderRadius: 2,
-                bgcolor: "#ECFDF5",
-                border: "1px solid #A7F3D0",
-                textAlign: "center",
-              }}
-            >
-              <GroupsRoundedIcon
-                sx={{ color: "#059669", fontSize: 21 }}
-              />
+                <Typography
+                  fontSize={20}
+                  fontWeight={900}
+                  color="#047857"
+                  lineHeight={1.2}
+                >
+                  {students.length}
+                </Typography>
 
-              <Typography
-                fontSize={20}
-                fontWeight={900}
-                color="#047857"
-                lineHeight={1.2}
+                <Typography
+                  fontSize={9}
+                  fontWeight={700}
+                  color="#047857"
+                >
+                  TỔNG SỐ HỌC SINH
+                </Typography>
+              </Paper>
+            </Grid>
+
+            {/* SỐ NHÓM DỰ KIẾN */}
+            <Grid item xs={4}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor: "#FFF7ED",
+                  border: "1px solid #FED7AA",
+                  textAlign: "center",
+                }}
               >
-                {students.length}
-              </Typography>
+                <ShuffleRoundedIcon
+                  sx={{ color: "#EA580C", fontSize: 21 }}
+                />
 
-              <Typography
-                fontSize={9}
-                fontWeight={700}
-                color="#047857"
-              >
-                TỔNG SỐ HỌC SINH
-              </Typography>
-            </Paper>
-          </Grid>
+                <Typography
+                  fontSize={20}
+                  fontWeight={900}
+                  color="#C2410C"
+                  lineHeight={1.2}
+                >
+                  {groupCount}
+                </Typography>
 
-          {/* SỐ NHÓM DỰ KIẾN */}
-          <Grid item xs={4}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: 1,
-                borderRadius: 2,
-                bgcolor: "#FFF7ED",
-                border: "1px solid #FED7AA",
-                textAlign: "center",
-              }}
-            >
-              <ShuffleRoundedIcon
-                sx={{ color: "#EA580C", fontSize: 21 }}
-              />
-
-              <Typography
-                fontSize={20}
-                fontWeight={900}
-                color="#C2410C"
-                lineHeight={1.2}
-              >
-                {groupCount}
-              </Typography>
-
-              <Typography
-                fontSize={9}
-                fontWeight={700}
-                color="#C2410C"
-              >
-                SỐ NHÓM DỰ KIẾN
-              </Typography>
-            </Paper>
+                <Typography
+                  fontSize={9}
+                  fontWeight={700}
+                  color="#C2410C"
+                >
+                  SỐ NHÓM DỰ KIẾN
+                </Typography>
+              </Paper>
+            </Grid>
           </Grid>
         </Grid>
-      </Grid>
 
-      {/* ĐIỀU CHỈNH SỐ NHÓM */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          borderRadius: 3,
-          border: "1px solid #E2E8F0",
-          bgcolor: "#fff",
-          mb: 2,
-          mt: -2
-        }}
-      >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          mb={1}
-        >
-          <Typography
-            fontWeight={800}
-            fontSize={14}
-            color="#334155"
-          >
-            SỐ NHÓM MUỐN CHIA
-          </Typography>
-
-          <Chip
-            label={`${groupCount} nhóm`}
-            sx={{
-              fontWeight: 800,
-              color: "#1D4ED8",
-              bgcolor: "#DBEAFE",
-              border: "1px solid #BFDBFE",
-            }}
-          />
-        </Stack>
-
-        <Slider
-          value={groupCount}
-          onChange={(_, value) => {
-            setGroupCount(value);
-            setGroups([]);
-          }}
-          min={2}
-          max={maxGroups}
-          marks
-          step={1}
-          valueLabelDisplay="auto"
+        {/* ĐIỀU CHỈNH SỐ NHÓM */}
+        <Paper
+          elevation={0}
           sx={{
-            color: "#2563EB",
-            mt: 1,
-            "& .MuiSlider-thumb": {
-              width: 19,
-              height: 19,
-              boxShadow: "0 0 0 5px rgba(37,99,235,0.12)",
-            },
-            "& .MuiSlider-rail": {
-              opacity: 0.2,
-            },
+            p: 2,
+            borderRadius: 3,
+            border: "1px solid #E2E8F0",
+            bgcolor: "#fff",
+            mb: 2,
+            mt: -2,
           }}
-        />
-
-        <Typography
-          fontSize={12}
-          color="text.secondary"
-          textAlign="center"
         >
-          Kéo thanh trượt để chọn số nhóm từ 2 đến {maxGroups}
-        </Typography>
-      </Paper>
-
-      {/* NÚT CHIA NHÓM */}
-      <Button
-        fullWidth
-        variant="contained"
-        startIcon={<ShuffleRoundedIcon />}
-        onClick={handleCreateGroups}
-        disabled={!students.length}
-        sx={{
-          py: 1.5,
-          borderRadius: 2.5,
-          fontWeight: 900,
-          fontSize: 14,
-          letterSpacing: 0.3,
-          color: "#fff",
-          background:
-            "linear-gradient(90deg, #2563EB, #0EA5E9)",
-          boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
-          "&:hover": {
-            background:
-              "linear-gradient(90deg, #1D4ED8, #0284C7)",
-            boxShadow: "0 6px 16px rgba(37,99,235,0.4)",
-          },
-          "&.Mui-disabled": {
-            color: "#FFFFFF",
-            background: "#94A3B8",
-          },
-        }}
-      >
-        XÁO TRỘN VÀ CHIA NHÓM
-      </Button>
-
-      {/* KẾT QUẢ CHIA NHÓM */}
-      {groups.length > 0 && (
-        <Box sx={{ mt: 2.5 }}>
           <Stack
             direction="row"
             alignItems="center"
-            spacing={1}
-            mb={1.5}
+            justifyContent="space-between"
+            mb={1}
           >
-            <AutoAwesomeRoundedIcon sx={{ color: "#2563EB" }} />
-
             <Typography
-              fontWeight={900}
-              fontSize={15}
-              color="#0F172A"
+              fontWeight={800}
+              fontSize={14}
+              color="#334155"
             >
-              KẾT QUẢ CHIA NHÓM
+              SỐ NHÓM MUỐN CHIA
             </Typography>
 
             <Chip
-              size="small"
-              label={`${students.length} học sinh`}
+              label={`${groupCount} nhóm`}
               sx={{
-                ml: "auto !important",
-                fontWeight: 700,
-                bgcolor: "#DBEAFE",
+                fontWeight: 800,
                 color: "#1D4ED8",
+                bgcolor: "#DBEAFE",
+                border: "1px solid #BFDBFE",
               }}
             />
           </Stack>
 
-          <Grid container spacing={2} alignItems="stretch">
-            {groups.map((group, index) => {
-              const color =
-                groupColors[index % groupColors.length];
+          <Slider
+            value={groupCount}
+            onChange={(_, value) => {
+              setGroupCount(value);
+              setGroups([]);
+            }}
+            min={2}
+            max={maxGroups}
+            marks
+            step={1}
+            valueLabelDisplay="auto"
+            sx={{
+              color: "#2563EB",
+              mt: 1,
+              "& .MuiSlider-thumb": {
+                width: 19,
+                height: 19,
+                boxShadow:
+                  "0 0 0 5px rgba(37,99,235,0.12)",
+              },
+              "& .MuiSlider-rail": {
+                opacity: 0.2,
+              },
+            }}
+          />
 
-              return (
-                <Grid
-                  item
-                  xs={12}
-                  sm={6}
-                  key={index}
-                  sx={{
-                    display: "flex",
-                    minWidth: 0,
-                  }}
-                >
+          <Typography
+            fontSize={12}
+            color="text.secondary"
+            textAlign="center"
+          >
+            Kéo thanh trượt để chọn số nhóm từ 2 đến {maxGroups}
+          </Typography>
+        </Paper>
+
+        {/* NÚT CHIA NHÓM */}
+        <Button
+          fullWidth
+          variant="contained"
+          startIcon={<ShuffleRoundedIcon />}
+          onClick={handleCreateGroups}
+          disabled={!students.length}
+          sx={{
+            py: 1.5,
+            borderRadius: 2.5,
+            fontWeight: 900,
+            fontSize: 14,
+            letterSpacing: 0.3,
+            color: "#fff",
+            background:
+              "linear-gradient(90deg, #2563EB, #0EA5E9)",
+            boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+            "&:hover": {
+              background:
+                "linear-gradient(90deg, #1D4ED8, #0284C7)",
+              boxShadow:
+                "0 6px 16px rgba(37,99,235,0.4)",
+            },
+            "&.Mui-disabled": {
+              color: "#FFFFFF",
+              background: "#94A3B8",
+            },
+          }}
+        >
+          XÁO TRỘN VÀ CHIA NHÓM
+        </Button>
+
+        {/* KẾT QUẢ CHIA NHÓM */}
+        {groups.length > 0 && (
+          <Box sx={{ mt: 2.5 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              mb={1.5}
+            >
+              <AutoAwesomeRoundedIcon
+                sx={{ color: "#2563EB" }}
+              />
+
+              <Typography
+                fontWeight={900}
+                fontSize={15}
+                color="#0F172A"
+              >
+                KẾT QUẢ CHIA NHÓM
+              </Typography>
+
+              <Chip
+                size="small"
+                label={`${students.length} học sinh`}
+                sx={{
+                  ml: "auto !important",
+                  fontWeight: 700,
+                  bgcolor: "#DBEAFE",
+                  color: "#1D4ED8",
+                }}
+              />
+            </Stack>
+
+            {/* DANH SÁCH NHÓM - CHIỀU RỘNG CỐ ĐỊNH */}
+            <Box
+              sx={{
+                display: "grid",
+
+                // Màn hình nhỏ: mỗi hàng một nhóm
+                // Desktop: mỗi thẻ rộng cố định 320px
+                gridTemplateColumns: {
+                  xs: "minmax(0, 1fr)",
+                  sm: "repeat(auto-fill, 230px)",
+                },
+
+                justifyContent: "center",
+                gap: 2,
+                width: "100%",
+                minWidth: 0,
+              }}
+            >
+              {groups.map((group, index) => {
+                const color =
+                  groupColors[index % groupColors.length];
+
+                return (
                   <Paper
+                    key={index}
                     elevation={0}
                     sx={{
                       p: 1.7,
-                      width: "100%",
+
+                      // Chiều rộng cố định
+                      width: "320px",
+                      maxWidth: "100%",
                       minWidth: 0,
+
                       height: "100%",
                       minHeight: 210,
                       boxSizing: "border-box",
+
                       borderRadius: 2.5,
                       border: `1px solid ${color.border}`,
                       bgcolor: color.light,
+
                       display: "flex",
                       flexDirection: "column",
+
                       transition: "all 0.2s ease",
+
                       "&:hover": {
                         transform: "translateY(-2px)",
                         boxShadow:
@@ -706,65 +733,64 @@ return (
                       ))}
                     </Box>
                   </Paper>
-                </Grid>
-              );
-            })}
-          </Grid>
+                );
+              })}
+            </Box>
 
-          {/* THÔNG BÁO */}
-          <Paper
-            elevation={0}
-            sx={{
-              mt: 1.5,
-              p: 1.3,
-              borderRadius: 2,
-              bgcolor: "#EFF6FF",
-              border: "1px solid #BFDBFE",
-            }}
-          >
-            <Typography
-              fontSize={12}
-              color="#1E40AF"
-              textAlign="center"
-              fontWeight={600}
+            {/* THÔNG BÁO */}
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 1.5,
+                p: 1.3,
+                borderRadius: 2,
+                bgcolor: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+              }}
             >
-              <AutoAwesomeRoundedIcon
-                sx={{
-                  fontSize: 15,
-                  verticalAlign: "middle",
-                  mr: 0.5,
-                }}
-              />
-              Đã chia đều {students.length} học sinh thành{" "}
-              {groups.length} nhóm
-            </Typography>
-          </Paper>
-        </Box>
-      )}
+              <Typography
+                fontSize={12}
+                color="#1E40AF"
+                textAlign="center"
+                fontWeight={600}
+              >
+                <AutoAwesomeRoundedIcon
+                  sx={{
+                    fontSize: 15,
+                    verticalAlign: "middle",
+                    mr: 0.5,
+                  }}
+                />
+                Đã chia đều {students.length} học sinh thành{" "}
+                {groups.length} nhóm
+              </Typography>
+            </Paper>
+          </Box>
+        )}
 
-      {loadingStudents ? (
-        <Typography
-          textAlign="center"
-          color="primary"
-          fontSize={13}
-          sx={{ mt: 2 }}
-        >
-          Đang tải danh sách học sinh...
-        </Typography>
-      ) : !students.length ? (
-        <Typography
-          textAlign="center"
-          color="text.secondary"
-          fontSize={13}
-          sx={{ mt: 2 }}
-        >
-          {selectedClass
-            ? `Chưa có danh sách học sinh lớp ${selectedClass}.`
-            : "Vui lòng chọn lớp trước khi chia nhóm."}
-        </Typography>
-      ) : null}
-    </DialogContent>
-  </Dialog>
-);
-
+        {/* TRẠNG THÁI HỌC SINH */}
+        {loadingStudents ? (
+          <Typography
+            textAlign="center"
+            color="primary"
+            fontSize={13}
+            sx={{ mt: 2 }}
+          >
+            Đang tải danh sách học sinh...
+          </Typography>
+        ) : !students.length ? (
+          <Typography
+            textAlign="center"
+            color="text.secondary"
+            fontSize={13}
+            sx={{ mt: 2 }}
+          >
+            {selectedClass
+              ? `Chưa có danh sách học sinh lớp ${selectedClass}.`
+              : "Vui lòng chọn lớp trước khi chia nhóm."}
+          </Typography>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
 }
