@@ -16,20 +16,28 @@ import {
   Snackbar,
   Alert,
   IconButton,
+  Chip,
 } from "@mui/material";
+
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import SettingsIcon from "@mui/icons-material/Settings";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+
+import TimeLimitDialog from "../dialog/TimeLimitDialog";
 
 import SendIcon from "@mui/icons-material/Send";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import CloseIcon from "@mui/icons-material/Close";
 
 import { StudentContext } from "../context/StudentContext";
-import ThongTinPhieuHocTap from "../components/ThongTinPhieuHocTap";
+import { useWorksheetContext } from "../context/WorksheetContext";
 
 import {
   doc,
   getDoc,
   getDocs,
   collection,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -78,8 +86,24 @@ const getStudentName = (student) =>
 // ======================================================
 
 export default function PhieuHocTap() {
+
+  const DEFAULT_HEADER_BACKGROUND = "";
+
+  const [headerBackground, setHeaderBackground] = useState(
+    DEFAULT_HEADER_BACKGROUND
+  );
+
   const studentContext = useContext(StudentContext);
   const getUploadedStudents = studentContext?.getUploadedStudents;
+  // Luôn sử dụng hàm mới nhất mà không làm useEffect chạy lại
+  const getUploadedStudentsRef = useRef(getUploadedStudents);
+  getUploadedStudentsRef.current = getUploadedStudents;
+
+  // WORKSHEET CONTEXT
+  const {
+    getWorksheet,
+    setWorksheet,
+  } = useWorksheetContext();
 
   const location = useLocation();
 
@@ -107,11 +131,43 @@ export default function PhieuHocTap() {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(10);
   const [startTime, setStartTime] = useState(null);
 
+  const [openTimeDialog, setOpenTimeDialog] = useState(false);
+
   useEffect(() => {
     if (started && !startTime) {
       setStartTime(Date.now());
     }
   }, [started, startTime]);
+
+
+
+  useEffect(() => {
+    const loadHeaderBackground = async () => {
+      try {
+        const currentUser = JSON.parse(
+          localStorage.getItem("tools_user") || "null"
+        );
+
+        const username = currentUser?.username;
+        if (!username) return;
+
+        const userRef = doc(db, "USERS", username);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+
+          setHeaderBackground(
+            data.headerBackground || DEFAULT_HEADER_BACKGROUND
+          );
+        }
+      } catch (error) {
+        console.error("Lỗi tải hình nền header:", error);
+      }
+    };
+
+    loadHeaderBackground();
+  }, []);
 
 
   // ----------------------------------------------------
@@ -143,7 +199,8 @@ export default function PhieuHocTap() {
   // GIAO DIỆN
   // ----------------------------------------------------
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [worksheetLoading, setWorksheetLoading] = useState(false);
   const [openSoanDialog, setOpenSoanDialog] = useState(false);
   const [zoomImage, setZoomImage] = useState(null);
 
@@ -198,6 +255,52 @@ export default function PhieuHocTap() {
     });
   }, []);
 
+  const handleSaveTimeLimit = async (minutes) => {
+    try {
+      const currentUser = JSON.parse(
+        localStorage.getItem("tools_user") || "{}"
+      );
+
+      const username = String(
+        currentUser?.username || ""
+      ).trim().toLowerCase();
+
+      if (!username) {
+        showMessage("Không xác định được tài khoản.", "error");
+        return;
+      }
+
+      const newTimeLimit = Number(minutes);
+
+      if (
+        !Number.isFinite(newTimeLimit) ||
+        newTimeLimit <= 0
+      ) {
+        showMessage("Thời gian không hợp lệ.", "warning");
+        return;
+      }
+
+      await updateDoc(doc(db, "USERS", username), {
+        timeLimitMinutes: newTimeLimit,
+      });
+
+      setTimeLimitMinutes(newTimeLimit);
+
+      // Chỉ cập nhật đồng hồ khi chưa bắt đầu hoặc đã kết thúc
+      if (!started || submitted) {
+        setTimeLeft(newTimeLimit * 60);
+      }
+
+      setOpenTimeDialog(false);
+
+      showMessage("Đã cập nhật thời gian làm bài.", "success");
+    } catch (error) {
+      console.error("Lỗi lưu thời gian:", error);
+
+      showMessage("Không thể cập nhật thời gian.", "error");
+    }
+  };
+
   // ======================================================
   // KHỞI TẠO ĐÁP ÁN
   // ======================================================
@@ -217,243 +320,286 @@ export default function PhieuHocTap() {
   // TẢI DỮ LIỆU PHIẾU HỌC TẬP
   // ======================================================
 
-  useEffect(() => {
-    let active = true;
+  
 
-    const loadData = async () => {
-      setLoading(true);
+useEffect(() => {
+  let active = true;
+
+  const loadData = async () => {
+    //setLoading(true);
+    setWorksheetLoading(true);
+
+    try {
+      // =====================================================
+      // 1. LẤY TÀI KHOẢN ĐĂNG NHẬP
+      // =====================================================
+
+      let currentUser = {};
 
       try {
-        // 1. LẤY USERNAME ĐĂNG NHẬP
-
-        let currentUser = {};
-
-        try {
-          currentUser = JSON.parse(
-            localStorage.getItem("tools_user") || "{}"
-          );
-        } catch (error) {
-          console.error("Lỗi đọc tools_user:", error);
-        }
-
-        const username = String(
-          currentUser?.username || ""
-        )
-          .trim()
-          .toLowerCase();
-
-        if (!username) {
-          showMessage(
-            "Không xác định được tài khoản giáo viên.",
-            "error"
-          );
-          return;
-        }
-
-        // 2. ĐỌC THÔNG TIN GIÁO VIÊN
-        // THỜI GIAN LẤY TỪ USERS/{username}/timeLimitMinutes
-
-        const userSnapshot = await getDoc(
-          doc(db, "USERS", username)
+        currentUser = JSON.parse(
+          localStorage.getItem("tools_user") || "{}"
         );
+      } catch {
+        currentUser = {};
+      }
 
-        if (!active) return;
+      const username = String(
+        currentUser?.username || ""
+      )
+        .trim()
+        .toLowerCase();
 
-        if (!userSnapshot.exists()) {
+      if (!username) {
+        showMessage(
+          "Không xác định được tài khoản giáo viên.",
+          "error"
+        );
+        return;
+      }
+
+      
+      // =====================================================
+      // 2. ĐỌC CẤU HÌNH ĐÃ LƯU ĐỂ KHÔI PHỤC CACHE NGAY
+      // =====================================================
+
+      let savedSettings = {};
+
+      try {
+        savedSettings = JSON.parse(
+          localStorage.getItem("worksheet_last_settings_v1") || "{}"
+        );
+      } catch {
+        savedSettings = {};
+      }
+
+      const cachedClass = String(
+        classFromState ||
+        location.state?.studentClass ||
+        savedSettings.lopDangChon ||
+        ""
+      ).trim();
+
+      const cachedSubject = String(
+        subjectFromState ||
+        savedSettings.monHoc ||
+        ""
+      ).trim();
+
+      const cachedWeek = String(
+        weekFromState ||
+        savedSettings.tuan ||
+        ""
+      ).trim();
+
+      // Khôi phục thời gian
+      const cachedTimeLimit = Number(
+        savedSettings.timeLimitMinutes
+      );
+
+      if (
+        Number.isFinite(cachedTimeLimit) &&
+        cachedTimeLimit > 0
+      ) {
+        setTimeLimitMinutes(cachedTimeLimit);
+
+        if (!timeLoadedRef.current) {
+          setTimeLeft(cachedTimeLimit * 60);
+          timeLoadedRef.current = true;
+        }
+      }
+
+      // =====================================================
+      // 3. KIỂM TRA CACHE ĐỀ NGAY LẬP TỨC
+      // =====================================================
+
+      let cachedWorksheetData = null;
+      let cachedWorksheetId = "";
+
+      if (cachedClass && cachedSubject && cachedWeek) {
+        const cachedWorksheet = getWorksheet({
+          selectedClass: cachedClass,
+          subject: cachedSubject,
+          selectedWeek: cachedWeek,
+          type: "phiếu học tập",
+        });
+
+        if (cachedWorksheet?.data) {
+          cachedWorksheetData = cachedWorksheet.data;
+          cachedWorksheetId = cachedWorksheet.worksheetId || "";
+
+          const rawQuestions = Array.isArray(
+            cachedWorksheetData.questions
+          )
+            ? cachedWorksheetData.questions
+            : [];
+
+          const normalizedQuestions = rawQuestions
+            .filter(
+              (question) =>
+                question &&
+                typeof question === "object" &&
+                String(question.question || "").trim()
+            )
+            .map((question) => normalizeQuestion(question));
+
+          setStudentClass(cachedClass);
+          setSubject(cachedSubject);
+          setSelectedWeek(cachedWeek);
+
+          setWorksheetId(cachedWorksheetId);
+
+          setWorksheetInfo({
+            title: "PHIẾU HỌC TẬP",
+            lessonTitle: cachedWorksheetData.lessonTitle || "",
+            subtitle: cachedWorksheetData.subtitle || "",
+            sectionTitle:
+              cachedWorksheetData.sectionTitle ||
+              "BÀI TẬP TRẮC NGHIỆM",
+          });
+
+          setQuestions(normalizedQuestions);
+          setAnswers(createInitialAnswers(normalizedQuestions));
+
+          // QUAN TRỌNG: HIỂN THỊ NGAY, KHÔNG CHỜ FIRESTORE
+          setWorksheetLoading(false);
+          setLoading(false);
+
+          console.log(
+            "[WORKSHEET CACHE] Đã hiển thị đề ngay từ localStorage"
+          );
+        }
+      }
+
+      // =====================================================
+      // 4. TẢI THÔNG TIN GIÁO VIÊN TỪ FIRESTORE
+      // =====================================================
+
+      const userSnapshot = await getDoc(
+        doc(db, "USERS", username)
+      );
+
+      if (!active) return;
+
+      if (!userSnapshot.exists()) {
+        if (!cachedWorksheetData) {
           showMessage(
             "Không tìm thấy thông tin giáo viên.",
             "error"
           );
-          return;
         }
+        return;
+      }
 
-        const userData = userSnapshot.data();
+      const userData = userSnapshot.data();
 
-        const loadedTimeLimit = Number(
-          userData.timeLimitMinutes
+      // Lưu cấu hình cho lần mở trang tiếp theo
+      localStorage.setItem(
+        "worksheet_last_settings_v1",
+        JSON.stringify({
+          lopDangChon: userData.lopDangChon || "",
+          monHoc: userData.monHoc || "",
+          tuan: userData.tuan || "",
+          timeLimitMinutes: userData.timeLimitMinutes || 10,
+        })
+      );
+
+
+      // Thời gian làm bài
+      const loadedTimeLimit = Number(
+        userData.timeLimitMinutes
+      );
+
+      const safeTimeLimit =
+        Number.isFinite(loadedTimeLimit) &&
+        loadedTimeLimit > 0
+          ? loadedTimeLimit
+          : 10;
+
+      setTimeLimitMinutes(safeTimeLimit);
+
+      if (!timeLoadedRef.current) {
+        setTimeLeft(safeTimeLimit * 60);
+        timeLoadedRef.current = true;
+      }
+
+      // =====================================================
+      // 3. XÁC ĐỊNH LỚP - MÔN - TUẦN
+      // =====================================================
+
+      const classToUse = String(
+        userData.lopDangChon ||
+          classFromState ||
+          location.state?.studentClass ||
+          ""
+      ).trim();
+
+      const subjectToUse = String(
+        userData.monHoc ||
+          subjectFromState ||
+          ""
+      ).trim();
+
+      const weekToUse = String(
+        userData.tuan ?? weekFromState ?? ""
+      ).trim();
+
+      setStudentClass(classToUse);
+      setSubject(subjectToUse);
+      setSelectedWeek(weekToUse);
+
+      if (
+        !classToUse ||
+        !subjectToUse ||
+        !weekToUse
+      ) {
+        setQuestions([]);
+        setAnswers({});
+        setWorksheetId("");
+
+        showMessage(
+          "Vui lòng chọn đầy đủ tuần học, lớp và môn học trước khi mở phiếu.",
+          "warning"
         );
 
-        const safeTimeLimit =
-          Number.isFinite(loadedTimeLimit) &&
-          loadedTimeLimit > 0
-            ? loadedTimeLimit
-            : 10;
+        return;
+      }
 
-        setTimeLimitMinutes(safeTimeLimit);
+      // =====================================================
+      // 4. TÌM PHIẾU TRONG CONTEXT / LOCAL STORAGE
+      // =====================================================
 
-        // Chỉ khởi tạo thời gian một lần khi tải phiếu
-        if (!timeLoadedRef.current) {
-          setTimeLeft(safeTimeLimit * 60);
-          timeLoadedRef.current = true;
+      const cacheParams = {
+        selectedClass: classToUse,
+        subject: subjectToUse,
+        selectedWeek: weekToUse,
+        type: "phiếu học tập",
+      };
+
+      let worksheetData = null;
+      let foundWorksheetId = "";
+
+      try {
+        const cachedWorksheet = getWorksheet(cacheParams);
+
+        if (
+          cachedWorksheet?.data &&
+          typeof cachedWorksheet.data === "object"
+        ) {
+          worksheetData = cachedWorksheet.data;
+          foundWorksheetId =
+            cachedWorksheet.worksheetId || "";
         }
+      } catch {
+        worksheetData = null;
+      }
 
+      // =====================================================
+      // 5. NẾU CHƯA CÓ CACHE THÌ TẢI TỪ FIRESTORE
+      // =====================================================
 
-        console.log("Tài khoản:", username);
-        console.log(
-          "Thời gian làm bài:",
-          safeTimeLimit,
-          "phút"
-        );
-
-        // 3. LẤY TUẦN - LỚP - MÔN ĐANG CHỌN
-
-        const classToUse = String(
-          userData.lopDangChon ||
-            classFromState ||
-            location.state?.studentClass ||
-            ""
-        ).trim();
-
-        const subjectToUse = String(
-          userData.monHoc ||
-            subjectFromState ||
-            ""
-        ).trim();
-
-        const weekToUse = String(
-          userData.tuan ?? weekFromState ?? ""
-        ).trim();
-
-        setStudentClass(classToUse);
-        setSubject(subjectToUse);
-        setSelectedWeek(weekToUse);
-
-        // =====================================================
-        // 4. TẢI DANH SÁCH HỌC SINH
-        // =====================================================
-
-        let students = [];
-
-        if (classToUse) {
-          let contextStudents = null;
-
-          try {
-            if (typeof getUploadedStudents === "function") {
-              contextStudents = getUploadedStudents(
-                username,
-                classToUse
-              );
-            }
-          } catch (error) {
-            console.error(
-              "Lỗi lấy danh sách học sinh từ StudentContext:",
-              error
-            );
-          }
-
-          if (
-            Array.isArray(contextStudents) &&
-            contextStudents.length > 0
-          ) {
-            students = contextStudents.map(
-              (student, index) => {
-                const studentCode = String(
-                  student.maDinhDanh ||
-                    student.maHS ||
-                    student.stt ||
-                    student.id ||
-                    index
-                );
-
-                return {
-                  ...student,
-                  id: studentCode,
-                  maDinhDanh: studentCode,
-                  hoTen: getStudentName(student),
-                };
-              }
-            );
-
-            console.log(
-              "Danh sách học sinh từ StudentContext:",
-              students
-            );
-          } else {
-            // LẤY DANH SÁCH HỌC SINH TỪ FIRESTORE
-
-            try {
-              const firestoreClass = classToUse.replace(
-                /\./g,
-                "_"
-              );
-
-              const studentsRef = collection(
-                db,
-                "USERS",
-                username,
-                "DANHSACH_HOCSINH",
-                firestoreClass,
-                "HOCSINH"
-              );
-
-              const studentsSnapshot = await getDocs(
-                studentsRef
-              );
-
-              students = studentsSnapshot.docs.map(
-                (studentDoc) => {
-                  const data = studentDoc.data();
-
-                  return {
-                    ...data,
-                    id: studentDoc.id,
-                    maDinhDanh:
-                      data.maDinhDanh ||
-                      data.maHS ||
-                      studentDoc.id,
-                    hoTen: getStudentName(data),
-                  };
-                }
-              );
-
-              console.log(
-                "Danh sách học sinh từ Firestore:",
-                students
-              );
-            } catch (error) {
-              console.error(
-                "Lỗi lấy danh sách học sinh từ Firestore:",
-                error
-              );
-
-              students = [];
-            }
-          }
-        }
-
-        if (!active) return;
-
-        setStudentList(students);
-
-        console.log(
-          "Lớp:",
-          classToUse,
-          "| Tổng số học sinh:",
-          students.length
-        );
-
-        // =====================================================
-        // 5. KIỂM TRA ĐỦ THÔNG TIN
-        // =====================================================
-
-        if (!classToUse || !subjectToUse || !weekToUse) {
-          setQuestions([]);
-          setWorksheetId("");
-
-          showMessage(
-            "Vui lòng chọn đầy đủ tuần học, lớp và môn học trước khi mở phiếu.",
-            "warning"
-          );
-
-          return;
-        }
-
-        // =====================================================
-        // 6. TÌM PHIẾU TRONG FIRESTORE
-        // =====================================================
-
-        let worksheetSnapshot = null;
-        let foundWorksheetId = "";
+      if (!worksheetData) {
+        setWorksheetLoading(true);
 
         const getGradeLabel = (className) => {
           const value = String(className || "").trim();
@@ -470,19 +616,17 @@ export default function PhieuHocTap() {
         };
 
         const selectedGrade = getGradeLabel(classToUse);
-        const subjectCollection = subjectToUse;
 
         const worksheetCollection = collection(
           db,
           "USERS",
           username,
           "PHIEU_HOC_TAP",
-          subjectCollection,
+          subjectToUse,
           "DANHSACH"
         );
 
-        // 6.1. CÁC ID CÓ THỂ CÓ CỦA PHIẾU
-
+        // Các ID có thể có của phiếu
         const possibleIds = [
           documentIdFromState,
           `phieuhoc_${selectedGrade}_${weekToUse}`,
@@ -491,7 +635,11 @@ export default function PhieuHocTap() {
 
         const uniqueIds = [...new Set(possibleIds)];
 
-        // 6.2. ƯU TIÊN TÌM TRỰC TIẾP THEO ID
+        let worksheetSnapshot = null;
+
+        // -------------------------------------------------
+        // 5.1. TÌM TRỰC TIẾP THEO ID
+        // -------------------------------------------------
 
         for (const candidateId of uniqueIds) {
           const directSnapshot = await getDoc(
@@ -500,44 +648,47 @@ export default function PhieuHocTap() {
 
           if (!active) return;
 
-          if (directSnapshot.exists()) {
-            const data = directSnapshot.data();
+          if (!directSnapshot.exists()) continue;
 
-            const documentWeek = String(
-              data.tuan ?? data.selectedWeek ?? ""
-            ).trim();
+          const data = directSnapshot.data();
 
-            const documentSubject = String(
-              data.monHoc ??
-                data.mon ??
-                data.subject ??
-                subjectToUse
-            ).trim();
+          const documentWeek = String(
+            data.tuan ?? data.selectedWeek ?? ""
+          ).trim();
 
-            const documentGrade = getGradeLabel(
-              data.lop || data.khoi || ""
-            );
+          const documentSubject = String(
+            data.monHoc ??
+              data.mon ??
+              data.subject ??
+              subjectToUse
+          ).trim();
 
-            const sameWeek = documentWeek === weekToUse;
+          const documentGrade = getGradeLabel(
+            data.lop || data.khoi || ""
+          );
 
-            const sameSubject =
-              documentSubject.toLowerCase() ===
-              subjectToUse.toLowerCase();
+          const sameWeek =
+            documentWeek === weekToUse;
 
-            const sameGrade =
-              !documentGrade ||
-              documentGrade.toLowerCase() ===
-                selectedGrade.toLowerCase();
+          const sameSubject =
+            documentSubject.toLowerCase() ===
+            subjectToUse.toLowerCase();
 
-            if (sameWeek && sameSubject && sameGrade) {
-              worksheetSnapshot = directSnapshot;
-              foundWorksheetId = directSnapshot.id;
-              break;
-            }
+          const sameGrade =
+            !documentGrade ||
+            documentGrade.toLowerCase() ===
+              selectedGrade.toLowerCase();
+
+          if (sameWeek && sameSubject && sameGrade) {
+            worksheetSnapshot = directSnapshot;
+            foundWorksheetId = directSnapshot.id;
+            break;
           }
         }
 
-        // 6.3. NẾU KHÔNG TÌM THẤY ID TRỰC TIẾP
+        // -------------------------------------------------
+        // 5.2. NẾU KHÔNG CÓ ID THÌ TÌM TRONG DANH SÁCH
+        // -------------------------------------------------
 
         if (!worksheetSnapshot) {
           const allWorksheets = await getDocs(
@@ -546,8 +697,8 @@ export default function PhieuHocTap() {
 
           if (!active) return;
 
-          const matchedWorksheet = allWorksheets.docs.find(
-            (item) => {
+          const matchedWorksheet =
+            allWorksheets.docs.find((item) => {
               const data = item.data();
 
               const documentWeek = String(
@@ -565,7 +716,8 @@ export default function PhieuHocTap() {
                 data.lop || data.khoi || ""
               );
 
-              const sameWeek = documentWeek === weekToUse;
+              const sameWeek =
+                documentWeek === weekToUse;
 
               const sameSubject =
                 documentSubject.toLowerCase() ===
@@ -576,9 +728,12 @@ export default function PhieuHocTap() {
                 documentGrade.toLowerCase() ===
                   selectedGrade.toLowerCase();
 
-              return sameWeek && sameSubject && sameGrade;
-            }
-          );
+              return (
+                sameWeek &&
+                sameSubject &&
+                sameGrade
+              );
+            });
 
           if (matchedWorksheet) {
             worksheetSnapshot = matchedWorksheet;
@@ -588,21 +743,14 @@ export default function PhieuHocTap() {
 
         if (!active) return;
 
-        // =====================================================
-        // 7. KHÔNG TÌM THẤY PHIẾU
-        // =====================================================
+        // -------------------------------------------------
+        // 5.3. KHÔNG TÌM THẤY PHIẾU
+        // -------------------------------------------------
 
         if (!worksheetSnapshot) {
           setQuestions([]);
+          setAnswers({});
           setWorksheetId("");
-
-          console.error("Không tìm thấy phiếu học tập:", {
-            username,
-            subjectCollection,
-            selectedGrade,
-            weekToUse,
-            possibleIds,
-          });
 
           showMessage(
             `Không tìm thấy phiếu ${subjectToUse}, ${selectedGrade}, tuần ${weekToUse}.`,
@@ -612,168 +760,287 @@ export default function PhieuHocTap() {
           return;
         }
 
-        // =====================================================
-        // 8. LẤY DỮ LIỆU PHIẾU
-        // =====================================================
+        worksheetData = worksheetSnapshot.data();
 
-        const worksheetData = worksheetSnapshot.data();
+        // -------------------------------------------------
+        // 5.4. LƯU VÀO CONTEXT VÀ LOCAL STORAGE
+        // -------------------------------------------------
 
-        console.log("ĐÃ TÌM THẤY PHIẾU:", {
-          id: foundWorksheetId,
+        setWorksheet({
+          selectedClass: classToUse,
+          subject: subjectToUse,
+          selectedWeek: weekToUse,
+          type: "phiếu học tập",
+          worksheetId: foundWorksheetId,
           data: worksheetData,
         });
+      }
 
-        setWorksheetId(foundWorksheetId);
+      if (!active) return;
 
-        setWorksheetInfo({
-          title: "PHIẾU HỌC TẬP",
-          lessonTitle: worksheetData.lessonTitle || "",
-          subtitle: worksheetData.subtitle || "",
-          sectionTitle:
-            worksheetData.sectionTitle ||
-            "BÀI TẬP TRẮC NGHIỆM",
-        });
+      // =====================================================
+      // 6. KIỂM TRA DỮ LIỆU PHIẾU
+      // =====================================================
 
-        // =====================================================
-        // 9. LẤY VÀ CHUẨN HÓA CÂU HỎI
-        // =====================================================
+      if (
+        !worksheetData ||
+        typeof worksheetData !== "object"
+      ) {
+        setQuestions([]);
+        setAnswers({});
+        setWorksheetId("");
 
-        const rawQuestions = Array.isArray(
-          worksheetData.questions
+        showMessage(
+          "Dữ liệu phiếu học tập không hợp lệ.",
+          "warning"
+        );
+
+        return;
+      }
+
+      // =====================================================
+      // 7. CẬP NHẬT THÔNG TIN PHIẾU
+      // =====================================================
+
+      setWorksheetId(foundWorksheetId);
+
+      setWorksheetInfo({
+        title: "PHIẾU HỌC TẬP",
+        lessonTitle: worksheetData.lessonTitle || "",
+        subtitle: worksheetData.subtitle || "",
+        sectionTitle:
+          worksheetData.sectionTitle ||
+          "BÀI TẬP TRẮC NGHIỆM",
+      });
+
+      // =====================================================
+      // 8. CHUẨN HÓA CÂU HỎI
+      // =====================================================
+
+      const rawQuestions = Array.isArray(
+        worksheetData.questions
+      )
+        ? worksheetData.questions
+        : [];
+
+      const normalizedQuestions = rawQuestions
+        .filter(
+          (question) =>
+            question &&
+            typeof question === "object" &&
+            String(question.question || "").trim()
         )
-          ? worksheetData.questions
-          : [];
-
-        console.log(
-          "SỐ CÂU HỎI TRONG FIRESTORE:",
-          rawQuestions.length
+        .map((question) =>
+          normalizeQuestion(question)
         );
 
-        const normalizedQuestions = rawQuestions
-          .filter(
-            (question) =>
-              question &&
-              typeof question === "object" &&
-              String(question.question || "").trim()
-          )
-          .map((question) => normalizeQuestion(question));
+      setQuestions(normalizedQuestions);
 
-        console.log(
-          "SỐ CÂU HỎI SAU KHI CHUẨN HÓA:",
-          normalizedQuestions.length
+      setAnswers(
+        createInitialAnswers(normalizedQuestions)
+      );
+
+      if (normalizedQuestions.length === 0) {
+        showMessage(
+          "Đã tìm thấy phiếu nhưng phiếu chưa có câu hỏi hợp lệ.",
+          "warning"
         );
+      }
 
-        setQuestions(normalizedQuestions);
+      // =====================================================
+      // 9. HIỂN THỊ PHIẾU NGAY
+      // KHÔNG CHỜ TẢI DANH SÁCH HỌC SINH
+      // =====================================================
 
-        setAnswers(
-          createInitialAnswers(normalizedQuestions)
-        );
+      setWorksheetLoading(false);
+      setLoading(false);
 
-        if (normalizedQuestions.length === 0) {
-          showMessage(
-            "Đã tìm thấy phiếu nhưng phiếu chưa có câu hỏi hợp lệ.",
-            "warning"
-          );
-        }
+      // =====================================================
+      // 10. TẢI DANH SÁCH HỌC SINH RIÊNG
+      // =====================================================
 
-        // =====================================================
-        // 10. KHÔI PHỤC HỌC SINH ĐƯỢC TRUYỀN TỪ TRANG TRƯỚC
-        // =====================================================
+      let students = [];
 
-        const suppliedStudentName =
-          location.state?.studentName ||
-          location.state?.fullname ||
-          location.state?.hoTen ||
-          "";
+      if (classToUse) {
+        let contextStudents = null;
 
-        const suppliedStudentId = String(
-          location.state?.studentId ||
-            location.state?.maDinhDanh ||
-            ""
-        );
+        try {
+          const getStudents =
+            getUploadedStudentsRef.current;
 
-        if (suppliedStudentId) {
-          const foundStudent = students.find(
-            (student) =>
-              String(student.id) === suppliedStudentId ||
-              String(student.maDinhDanh || "") ===
-                suppliedStudentId
-          );
-
-          if (foundStudent) {
-            setSelectedStudent(foundStudent.id);
-
-            setFullname(
-              getStudentName(foundStudent) ||
-                suppliedStudentName
+          if (typeof getStudents === "function") {
+            contextStudents = getStudents(
+              username,
+              classToUse
             );
-
-            setStudentId(
-              foundStudent.maDinhDanh ||
-                foundStudent.id
-            );
-          } else {
-            setFullname(suppliedStudentName);
-            setStudentId(suppliedStudentId);
           }
-        } else if (suppliedStudentName) {
-          const foundStudent = students.find(
-            (student) =>
-              getStudentName(student)
-                .trim()
-                .toLowerCase() ===
-              String(suppliedStudentName)
-                .trim()
-                .toLowerCase()
+        } catch {
+          contextStudents = null;
+        }
+
+        // Ưu tiên danh sách từ StudentContext
+        if (
+          Array.isArray(contextStudents) &&
+          contextStudents.length > 0
+        ) {
+          students = contextStudents.map(
+            (student, index) => {
+              const studentCode = String(
+                student.maDinhDanh ||
+                  student.maHS ||
+                  student.stt ||
+                  student.id ||
+                  index
+              );
+
+              return {
+                ...student,
+                id: studentCode,
+                maDinhDanh: studentCode,
+                hoTen: getStudentName(student),
+              };
+            }
           );
-
-          if (foundStudent) {
-            setSelectedStudent(foundStudent.id);
-
-            setFullname(
-              getStudentName(foundStudent) ||
-                suppliedStudentName
+        } else {
+          // Không có trong Context thì lấy từ Firestore
+          try {
+            const firestoreClass = classToUse.replace(
+              /\./g,
+              "_"
             );
 
-            setStudentId(
-              foundStudent.maDinhDanh ||
-                foundStudent.id
+            const studentsRef = collection(
+              db,
+              "USERS",
+              username,
+              "DANHSACH_HOCSINH",
+              firestoreClass,
+              "HOCSINH"
             );
-          } else {
-            setFullname(suppliedStudentName);
+
+            const studentsSnapshot = await getDocs(
+              studentsRef
+            );
+
+            if (!active) return;
+
+            students = studentsSnapshot.docs.map(
+              (studentDoc) => {
+                const data = studentDoc.data();
+
+                return {
+                  ...data,
+                  id: studentDoc.id,
+                  maDinhDanh:
+                    data.maDinhDanh ||
+                    data.maHS ||
+                    studentDoc.id,
+                  hoTen: getStudentName(data),
+                };
+              }
+            );
+          } catch {
+            students = [];
           }
-        }
-      } catch (error) {
-        console.error("Lỗi tải phiếu học tập:", error);
-
-        if (active) {
-          showMessage(
-            "Có lỗi khi tải dữ liệu phiếu học tập.",
-            "error"
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
         }
       }
-    };
 
-    loadData();
+      if (!active) return;
 
-    return () => {
-      active = false;
-    };
-  }, [
-    classFromState,
-    subjectFromState,
-    weekFromState,
-    documentIdFromState,
-    location.state,
-    createInitialAnswers,
-    showMessage,
-    getUploadedStudents,
-  ]);
+      setStudentList(students);
+
+      // =====================================================
+      // 11. KHÔI PHỤC HỌC SINH TỪ TRANG TRƯỚC
+      // =====================================================
+
+      const suppliedStudentName = String(
+        location.state?.studentName ||
+          location.state?.fullname ||
+          location.state?.hoTen ||
+          ""
+      ).trim();
+
+      const suppliedStudentId = String(
+        location.state?.studentId ||
+          location.state?.maDinhDanh ||
+          ""
+      ).trim();
+
+      let foundStudent = null;
+
+      if (suppliedStudentId) {
+        foundStudent = students.find(
+          (student) =>
+            String(student.id) === suppliedStudentId ||
+            String(student.maDinhDanh || "") ===
+              suppliedStudentId
+        );
+      } else if (suppliedStudentName) {
+        foundStudent = students.find(
+          (student) =>
+            getStudentName(student)
+              .trim()
+              .toLowerCase() ===
+            suppliedStudentName.toLowerCase()
+        );
+      }
+
+      if (foundStudent) {
+        setSelectedStudent(foundStudent.id);
+
+        setFullname(
+          getStudentName(foundStudent) ||
+            suppliedStudentName
+        );
+
+        setStudentId(
+          foundStudent.maDinhDanh ||
+            foundStudent.id
+        );
+      } else if (suppliedStudentId) {
+        setFullname(suppliedStudentName);
+        setStudentId(suppliedStudentId);
+      } else if (suppliedStudentName) {
+        setFullname(suppliedStudentName);
+      }
+    } catch (error) {
+      if (active) {
+        showMessage(
+          "Có lỗi khi tải dữ liệu phiếu học tập.",
+          "error"
+        );
+      }
+    } finally {
+      if (active) {
+        setLoading(false);
+        setWorksheetLoading(false);
+      }
+    }
+  };
+
+  loadData();
+
+  return () => {
+    active = false;
+  };
+}, [
+  classFromState,
+  subjectFromState,
+  weekFromState,
+  documentIdFromState,
+  location.state?.studentName,
+  location.state?.fullname,
+  location.state?.hoTen,
+  location.state?.studentId,
+  location.state?.maDinhDanh,
+  location.state?.studentClass,
+  createInitialAnswers,
+  showMessage,
+  getWorksheet,
+  setWorksheet,
+]);
+
+
 
   // ======================================================
   // ĐỒNG HỒ ĐẾM NGƯỢC
@@ -915,14 +1182,6 @@ export default function PhieuHocTap() {
     (autoSubmit = false) => {
       if (submittingRef.current || submitted) return;
 
-      if (!fullname.trim()) {
-        showMessage(
-          "Vui lòng chọn học sinh trước khi nộp bài.",
-          "warning"
-        );
-        return;
-      }
-
       if (!questions.length) {
         showMessage(
           "Phiếu học tập chưa có câu hỏi.",
@@ -974,12 +1233,9 @@ export default function PhieuHocTap() {
 
       submittingRef.current = false;
 
-      showMessage(
-        autoSubmit
-          ? "Đã hết thời gian. Bài làm đã tự động nộp."
-          : "Đã nộp bài thành công.",
-        autoSubmit ? "info" : "success"
-      );
+      if (autoSubmit) {
+        showMessage("Đã hết thời gian. Bài làm đã tự động nộp.", "info");
+      }
     },
     [
       submitted,
@@ -1007,14 +1263,6 @@ export default function PhieuHocTap() {
   // ======================================================
 
   const handleStart = () => {
-    if (!fullname.trim()) {
-      showMessage(
-        "Vui lòng chọn học sinh trước khi làm bài.",
-        "warning"
-      );
-      return;
-    }
-
     if (!questions.length) {
       showMessage(
         "Phiếu học tập chưa có câu hỏi.",
@@ -1109,295 +1357,471 @@ export default function PhieuHocTap() {
       {/* TIÊU ĐỀ PHIẾU */}
 
       <Paper
-        elevation={0}
+  elevation={0}
+  sx={{
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: "16px",
+    overflow: "visible",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 5px 15px rgba(0,0,0,0.10)",
+    position: "sticky",
+    top: 0,
+    zIndex: 1100,
+    mb: 2,
+  }}
+>
+  {/* HEADER */}
+
+  
+<Box
+  sx={{
+    position: "relative",
+    overflow: "hidden",
+    isolation: "isolate",
+
+    // NỀN MẶC ĐỊNH HOẶC HÌNH NỀN ĐƯỢC CHỌN
+    ...(headerBackground
+      ? {
+          backgroundColor: "#0288cc",
+          backgroundImage: `
+            linear-gradient(
+              rgba(0, 55, 100, 0.30),
+              rgba(0, 55, 100, 0.30)
+            ),
+            url("${headerBackground}")
+          `,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+        }
+      : {
+          background:
+            "linear-gradient(120deg, #38bdf8 0%, #0288cc 50%, #0ea5e9 100%)",
+          backgroundSize: "200% 200%",
+          animation: "headerGradientMove 10s ease infinite",
+        }),
+
+    color: "#fff",
+    textAlign: "center",
+    px: { xs: 2, sm: 4 },
+    py: { xs: 1.2, sm: 1.8 },
+    borderRadius: "14px",
+    boxShadow: "0 5px 16px rgba(2, 136, 204, 0.2)",
+
+    "@keyframes headerGradientMove": {
+      "0%": { backgroundPosition: "0% 50%" },
+      "50%": { backgroundPosition: "100% 50%" },
+      "100%": { backgroundPosition: "0% 50%" },
+    },
+
+    "@keyframes headerTitleIn": {
+      "0%": {
+        opacity: 0,
+        transform: "translateY(15px)",
+      },
+      "100%": {
+        opacity: 1,
+        transform: "translateY(0)",
+      },
+    },
+
+    "@keyframes headerLineIn": {
+      "0%": {
+        opacity: 0,
+        transform: "scaleX(0)",
+      },
+      "100%": {
+        opacity: 1,
+        transform: "scaleX(1)",
+      },
+    },
+
+    "@keyframes headerDecorationFloat": {
+      "0%, 100%": {
+        transform: "translateY(0) rotate(0deg)",
+      },
+      "50%": {
+        transform: "translateY(9px) rotate(5deg)",
+      },
+    },
+
+    "@keyframes headerDiamond": {
+      "0%, 100%": {
+        transform: "rotate(45deg) scale(1)",
+      },
+      "50%": {
+        transform: "rotate(135deg) scale(1.15)",
+      },
+    },
+
+    "@media (prefers-reduced-motion: reduce)": {
+      "& *": {
+        animation: "none !important",
+      },
+    },
+  }}
+>
+  {/* HOA VĂN GÓC TRÁI */}
+
+  <Box
+    sx={{
+      position: "absolute",
+      zIndex: -1,
+      top: -65,
+      left: -45,
+      width: 190,
+      height: 190,
+      border: "2px solid rgba(255,255,255,0.20)",
+      borderRadius: "50%",
+      boxShadow:
+        "0 0 0 18px rgba(255,255,255,0.07), 0 0 0 38px rgba(255,255,255,0.05)",
+      animation: "headerDecorationFloat 7s ease-in-out infinite",
+    }}
+  />
+
+  {/* HOA VĂN GÓC PHẢI */}
+
+  <Box
+    sx={{
+      position: "absolute",
+      zIndex: -1,
+      top: -35,
+      right: -25,
+      width: 150,
+      height: 150,
+      transform: "rotate(35deg)",
+      border: "2px solid rgba(255,255,255,0.20)",
+      borderRadius: "28px",
+      boxShadow: "0 0 0 16px rgba(255,255,255,0.06)",
+      animation: "headerDecorationFloat 8s ease-in-out infinite",
+      animationDelay: "0.5s",
+    }}
+  />
+
+  {/* CÁC CHẤM TRANG TRÍ */}
+
+  <Box
+    sx={{
+      position: "absolute",
+      zIndex: -1,
+      bottom: 18,
+      left: { xs: 22, sm: 65 },
+      width: 9,
+      height: 9,
+      borderRadius: "50%",
+      backgroundColor: "#fef08a",
+      boxShadow:
+        "22px -14px 0 rgba(255,255,255,0.55), 44px 0 0 rgba(255,255,255,0.35)",
+    }}
+  />
+
+  <Box
+    sx={{
+      position: "absolute",
+      zIndex: -1,
+      top: 25,
+      right: { xs: 35, sm: 100 },
+      width: 7,
+      height: 7,
+      borderRadius: "50%",
+      backgroundColor: "#fde68a",
+      boxShadow:
+        "18px 15px 0 rgba(255,255,255,0.5), 35px -5px 0 rgba(255,255,255,0.3)",
+    }}
+  />
+
+  {/* NỘI DUNG TIÊU ĐỀ */}
+
+  <Box
+    sx={{
+      position: "relative",
+      zIndex: 1,
+    }}
+  >
+    {/* NÚT THOÁT */}
+
+    <IconButton
+      onClick={() => window.close()}
+      aria-label="Đóng phiếu học tập"
+      sx={{
+        position: "absolute",
+        top: { xs: 0, sm: 0 },
+        right: { xs: -10, sm: -16 },
+        width: { xs: 28, sm: 30 },
+        height: { xs: 28, sm: 30 },
+        color: "#fff",
+        bgcolor: "rgba(255,255,255,0.18)",
+        border: "1px solid rgba(255,255,255,0.55)",
+        borderRadius: "50%",
+        zIndex: 5,
+        "&:hover": {
+          bgcolor: "rgba(255,255,255,0.32)",
+        },
+      }}
+    >
+      <CloseIcon sx={{ fontSize: { xs: 17, sm: 19 } }} />
+    </IconButton>
+
+    {/* TIÊU ĐỀ CHÍNH */}
+
+    <Typography
+      sx={{
+        fontSize: { xs: 16, sm: 23 },
+        fontWeight: 900,
+        letterSpacing: { xs: 0.2, sm: 0.6 },
+        textTransform: "uppercase",
+        lineHeight: 1.25,
+        color: "#ffffff",
+        textShadow: "0 2px 3px rgba(0,60,100,0.15)",
+        animation: "headerTitleIn 800ms ease both",
+      }}
+    >
+      {worksheetInfo.title}
+    </Typography>
+
+    {/* DẢI TRANG TRÍ */}
+
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 0.8,
+        my: { xs: 0.8, sm: 1.1 },
+        animation: "headerLineIn 900ms ease both",
+        animationDelay: "200ms",
+      }}
+    >
+      <Box
         sx={{
-          width: "100%",
-          backgroundColor: "#fff",
-          borderRadius: "24px",
-          overflow: "visible",
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.10)",
-          mb: 2,
+          width: 28,
+          height: 2,
+          backgroundColor: "rgba(255,255,255,0.65)",
+          borderRadius: 2,
+        }}
+      />
+
+      <Box
+        sx={{
+          width: 7,
+          height: 7,
+          backgroundColor: "#fde68a",
+          transform: "rotate(45deg)",
+          borderRadius: "2px",
+          animation: "headerDiamond 3s ease-in-out infinite",
+        }}
+      />
+
+      <Box
+        sx={{
+          width: 28,
+          height: 2,
+          backgroundColor: "rgba(255,255,255,0.65)",
+          borderRadius: 2,
+        }}
+      />
+    </Box>
+
+    {/* TÊN BÀI HỌC */}
+
+    {worksheetInfo.lessonTitle && (
+      <Typography
+        sx={{
+          fontSize: { xs: 15, sm: 20 },
+          fontWeight: 900,
+          color: "#fff3b0",
+          textTransform: "uppercase",
+          lineHeight: 1.3,
+          textShadow: "0 2px 3px rgba(0,60,100,0.18)",
+          overflowWrap: "anywhere",
+          animation: "headerTitleIn 900ms ease both",
+          animationDelay: "300ms",
         }}
       >
-        {/* HEADER */}
+        {worksheetInfo.lessonTitle}
+      </Typography>
+    )}
 
-        <Box
-          sx={{
-            position: "relative",
-            overflow: "hidden",
-            isolation: "isolate",
+    {/* 3 CHIP CHỨC NĂNG TRÊN HEADER */}
 
-            // HÌNH NỀN PHIẾU HỌC TẬP
-            backgroundColor: "#0288cc",
-            backgroundImage: `
-              linear-gradient(
-                rgba(0, 55, 100, 0.30),
-                rgba(0, 55, 100, 0.30)
-              ),
-              url("/Phieu-hoc-tap.png")
-            `,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
+    <Box
+      sx={{
+        position: "relative",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        mt: { xs: 1, sm: 1.3 },
+        minHeight: { xs: 34, sm: 38 },
+      }}
+    >
+      {/* ĐỒNG HỒ */}
 
+      <Chip
+        icon={<AccessTimeIcon />}
+        label={
+          started || submitted
+            ? formatTime(timeLeft)
+            : `${timeLimitMinutes} phút`
+        }
+        sx={{
+          height: { xs: 34, sm: 38 },
+          fontSize: { xs: 15, sm: 17 },
+          fontWeight: 900,
+          color: "#fff",
+          backgroundColor: started
+            ? "#dc2626"
+            : "rgba(255,255,255,0.22)",
+          border: "1.5px solid rgba(255,255,255,0.75)",
+          borderRadius: "10px",
+          boxShadow: "0 2px 7px rgba(0,0,0,0.15)",
+          "& .MuiChip-icon": {
             color: "#fff",
-            textAlign: "center",
-            px: { xs: 2, sm: 4 },
-            py: { xs: 3.5, sm: 4.5 },
-            borderRadius: "14px",
-            boxShadow: "0 5px 16px rgba(2, 136, 204, 0.2)",
+            fontSize: { xs: 19, sm: 21 },
+            ml: 0.8,
+          },
+          "& .MuiChip-label": {
+            px: { xs: 1, sm: 1.3 },
+          },
+        }}
+      />
 
-            "@keyframes headerTitleIn": {
-              "0%": {
-                opacity: 0,
-                transform: "translateY(15px)",
-              },
-              "100%": {
-                opacity: 1,
-                transform: "translateY(0)",
-              },
+      {/* HAI CHIP BÊN PHẢI */}
+
+      <Box
+        sx={{
+          position: "absolute",
+          right: 0,
+          display: { xs: "none", sm: "flex" },
+          alignItems: "center",
+          gap: 0.7,
+        }}
+      >
+        {/* CẤU HÌNH */}
+
+        <Chip
+          icon={<SettingsIcon />}
+          label="Cấu hình"
+          clickable
+          disabled={started}
+          onClick={() => setOpenTimeDialog(true)}
+          sx={{
+            height: 32,
+            fontSize: 12,
+            fontWeight: 800,
+            color: "#fff",
+            backgroundColor: "rgba(255,255,255,0.20)",
+            border: "1px solid rgba(255,255,255,0.65)",
+            borderRadius: "8px",
+            "& .MuiChip-icon": {
+              color: "#fff",
+              fontSize: 17,
+              ml: 0.6,
             },
-
-            "@keyframes headerLineIn": {
-              "0%": {
-                opacity: 0,
-                transform: "scaleX(0)",
-              },
-              "100%": {
-                opacity: 1,
-                transform: "scaleX(1)",
-              },
+            "& .MuiChip-label": {
+              px: 0.8,
             },
-
-            "@keyframes headerDecorationFloat": {
-              "0%, 100%": {
-                transform: "translateY(0) rotate(0deg)",
-              },
-              "50%": {
-                transform: "translateY(9px) rotate(5deg)",
-              },
-            },
-
-            "@keyframes headerDiamond": {
-              "0%, 100%": {
-                transform: "rotate(45deg) scale(1)",
-              },
-              "50%": {
-                transform: "rotate(135deg) scale(1.15)",
-              },
-            },
-
-            "@media (prefers-reduced-motion: reduce)": {
-              "& *": {
-                animation: "none !important",
-              },
+            "&:hover": {
+              backgroundColor: "rgba(255,255,255,0.35)",
             },
           }}
-        >
-          {/* HOA VĂN GÓC TRÁI */}
-
-          <Box
-            sx={{
-              position: "absolute",
-              zIndex: -1,
-              top: -65,
-              left: -45,
-              width: 190,
-              height: 190,
-              border: "2px solid rgba(255,255,255,0.20)",
-              borderRadius: "50%",
-              boxShadow:
-                "0 0 0 18px rgba(255,255,255,0.07), 0 0 0 38px rgba(255,255,255,0.05)",
-              animation:
-                "headerDecorationFloat 7s ease-in-out infinite",
-            }}
-          />
-
-          {/* HOA VĂN GÓC PHẢI */}
-
-          <Box
-            sx={{
-              position: "absolute",
-              zIndex: -1,
-              top: -35,
-              right: -25,
-              width: 150,
-              height: 150,
-              transform: "rotate(35deg)",
-              border: "2px solid rgba(255,255,255,0.20)",
-              borderRadius: "28px",
-              boxShadow: "0 0 0 16px rgba(255,255,255,0.06)",
-              animation:
-                "headerDecorationFloat 8s ease-in-out infinite",
-              animationDelay: "0.5s",
-            }}
-          />
-
-          {/* CÁC CHẤM TRANG TRÍ */}
-
-          <Box
-            sx={{
-              position: "absolute",
-              zIndex: -1,
-              bottom: 18,
-              left: { xs: 22, sm: 65 },
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              backgroundColor: "#fef08a",
-              boxShadow:
-                "22px -14px 0 rgba(255,255,255,0.55), 44px 0 0 rgba(255,255,255,0.35)",
-            }}
-          />
-
-          <Box
-            sx={{
-              position: "absolute",
-              zIndex: -1,
-              top: 25,
-              right: { xs: 35, sm: 100 },
-              width: 7,
-              height: 7,
-              borderRadius: "50%",
-              backgroundColor: "#fde68a",
-              boxShadow:
-                "18px 15px 0 rgba(255,255,255,0.5), 35px -5px 0 rgba(255,255,255,0.3)",
-            }}
-          />
-
-          {/* NỘI DUNG TIÊU ĐỀ */}
-
-          <Box
-            sx={{
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {/* NÚT THOÁT */}
-
-            <IconButton
-              onClick={() => window.close()}
-              aria-label="Đóng phiếu học tập"
-              sx={{
-                position: "absolute",
-                top: { xs: -18, sm: -22 },
-                right: { xs: -12, sm: -22 },
-                width: 34,
-                height: 34,
-                color: "#fff",
-                bgcolor: "rgba(255,255,255,0.18)",
-                border: "1px solid rgba(255,255,255,0.55)",
-                borderRadius: "50%",
-                zIndex: 5,
-                "&:hover": {
-                  bgcolor: "rgba(255,255,255,0.32)",
-                },
-              }}
-            >
-              <CloseIcon sx={{ fontSize: 21 }} />
-            </IconButton>
-
-            <Typography
-              sx={{
-                fontSize: { xs: 19, sm: 27 },
-                fontWeight: 900,
-                letterSpacing: { xs: 0.3, sm: 0.8 },
-                textTransform: "uppercase",
-                lineHeight: 1.4,
-                color: "#ffffff",
-                textShadow: "0 2px 3px rgba(0,60,100,0.15)",
-                animation: "headerTitleIn 800ms ease both",
-              }}
-            >
-              {worksheetInfo.title}
-            </Typography>
-
-            {/* DẢI TRANG TRÍ */}
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-                my: 1.8,
-                animation: "headerLineIn 900ms ease both",
-                animationDelay: "200ms",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 35,
-                  height: 2,
-                  backgroundColor: "rgba(255,255,255,0.65)",
-                  borderRadius: 2,
-                }}
-              />
-
-              <Box
-                sx={{
-                  width: 9,
-                  height: 9,
-                  backgroundColor: "#fde68a",
-                  transform: "rotate(45deg)",
-                  borderRadius: "2px",
-                  animation: "headerDiamond 3s ease-in-out infinite",
-                }}
-              />
-
-              <Box
-                sx={{
-                  width: 35,
-                  height: 2,
-                  backgroundColor: "rgba(255,255,255,0.65)",
-                  borderRadius: 2,
-                }}
-              />
-            </Box>
-
-            {/* TÊN BÀI HỌC */}
-
-            {worksheetInfo.lessonTitle && (
-              <Typography
-                sx={{
-                  fontSize: { xs: 18, sm: 24 },
-                  fontWeight: 900,
-                  color: "#fff3b0",
-                  textTransform: "uppercase",
-                  lineHeight: 1.45,
-                  textShadow: "0 2px 3px rgba(0,60,100,0.18)",
-                  overflowWrap: "anywhere",
-                  animation: "headerTitleIn 900ms ease both",
-                  animationDelay: "300ms",
-                }}
-              >
-                {worksheetInfo.lessonTitle}
-              </Typography>
-            )}
-          </Box>
-        </Box>
-
-        <ThongTinPhieuHocTap
-          submitted={submitted}
-          fullname={fullname}
-          selectedStudent={selectedStudent}
-          handleSelectStudent={handleSelectStudent}
-          started={started}
-          studentList={studentList}
-          studentClass={studentClass}
-          subject={subject}
-          selectedWeek={selectedWeek}
-          date={date}
-          timeLeft={timeLeft}
-          formatTime={formatTime}
-          answeredCount={answeredCount}
-          questions={questions}
-          setOpenSoanDialog={setOpenSoanDialog}
-          getStudentName={getStudentName}
-          timeLimitMinutes={timeLimitMinutes}
         />
-      </Paper>
+
+        {/* SOẠN ĐỀ */}
+
+        <Chip
+          icon={<EditNoteRoundedIcon />}
+          label="Soạn đề"
+          clickable
+          onClick={() => setOpenSoanDialog(true)}
+          sx={{
+            height: 32,
+            fontSize: 12,
+            fontWeight: 800,
+            color: "#fff",
+            backgroundColor: "rgba(255,255,255,0.20)",
+            border: "1px solid rgba(255,255,255,0.65)",
+            borderRadius: "8px",
+            "& .MuiChip-icon": {
+              color: "#fff",
+              fontSize: 17,
+              ml: 0.6,
+            },
+            "& .MuiChip-label": {
+              px: 0.8,
+            },
+            "&:hover": {
+              backgroundColor: "rgba(255,255,255,0.35)",
+            },
+          }}
+        />
+      </Box>
+    </Box>
+
+    {/* CHIP CHỨC NĂNG TRÊN ĐIỆN THOẠI */}
+
+    <Box
+      sx={{
+        display: { xs: "flex", sm: "none" },
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 0.8,
+        mt: 0.8,
+      }}
+    >
+      <Chip
+        icon={<SettingsIcon />}
+        label="Cấu hình"
+        clickable
+        disabled={started}
+        onClick={() => setOpenTimeDialog(true)}
+        sx={{
+          height: 28,
+          fontSize: 10,
+          fontWeight: 800,
+          color: "#fff",
+          backgroundColor: "rgba(255,255,255,0.20)",
+          border: "1px solid rgba(255,255,255,0.65)",
+          borderRadius: "8px",
+          "& .MuiChip-icon": {
+            color: "#fff",
+            fontSize: 15,
+            ml: 0.6,
+          },
+          "& .MuiChip-label": {
+            px: 0.7,
+          },
+        }}
+      />
+
+      <Chip
+        icon={<EditNoteRoundedIcon />}
+        label="Soạn đề"
+        clickable
+        onClick={() => setOpenSoanDialog(true)}
+        sx={{
+          height: 28,
+          fontSize: 10,
+          fontWeight: 800,
+          color: "#fff",
+          backgroundColor: "rgba(255,255,255,0.20)",
+          border: "1px solid rgba(255,255,255,0.65)",
+          borderRadius: "8px",
+          "& .MuiChip-icon": {
+            color: "#fff",
+            fontSize: 15,
+            ml: 0.6,
+          },
+          "& .MuiChip-label": {
+            px: 0.7,
+          },
+        }}
+      />
+    </Box>
+  </Box>
+</Box>
+
+</Paper>
 
       {/* DANH SÁCH CÂU HỎI */}
 
@@ -1610,6 +2034,16 @@ export default function PhieuHocTap() {
         open={Boolean(zoomImage)}
         image={zoomImage}
         onClose={() => setZoomImage(null)}
+      />
+
+      {/* DIALOG CẤU HÌNH THỜI GIAN */}
+
+      <TimeLimitDialog
+        open={openTimeDialog}
+        onClose={() => setOpenTimeDialog(false)}
+        timeLimitMinutes={timeLimitMinutes}
+        headerBackground={headerBackground}
+        onChangeBackground={setHeaderBackground}
       />
 
       {/* THÔNG BÁO */}

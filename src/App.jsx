@@ -27,6 +27,10 @@ import ChangePasswordDialog from "./dialog/ChangePasswordDialog";
 import UpdateProfileDialog from "./dialog/UpdateProfileDialog";
 
 import { StudentProvider } from "./context/StudentContext";
+import { WorksheetProvider } from "./context/WorksheetContext";
+
+import AppHeader from "./components/AppHeader";
+import AccountMenu from "./components/AccountMenu";
 
 import QuestionEngineTest from "./components/QuestionEngine/QuestionEngineTest";
 
@@ -261,374 +265,118 @@ export default function App() {
 
   return (
     <StudentProvider>
-      <>
-        {/* ================================================= */}
-        {/* APP BAR */}
-        {/* ================================================= */}
-
-        <AppBar
-          position="fixed"
-          sx={{
-            background: "#1976d2",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-          }}
-        >
-          <Toolbar
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 1,
-              minHeight: "48px !important",
-              paddingTop: 0,
-              paddingBottom: 0,
-              overflowX: "auto",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {/* LEFT: LOGO + DASHBOARD */}
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexShrink: 0,
-              }}
-            >
-              <Box
-                component="img"
-                src="/Logo.png"
-                alt="Logo"
-                onClick={() => setOpenLogo(true)}
-                sx={{
-                  height: 34,
-                  flexShrink: 0,
-                  ml: { xs: -1, sm: -2 },
-                  mr: 1,
-                  cursor: "pointer",
-                }}
-              />
-
-              <Button
-                sx={{
-                  color: "#fff",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  cursor: "default",
-                  "&:hover": {
-                    bgcolor: "transparent",
-                  },
-                }}
-              >
-                {user?.username
-                  ? (user?.tenTruong || "TH BÌNH KHÁNH").replace(/^Trường\s+/i, "")
-                  : "TH BÌNH KHÁNH"}
-              </Button>
-            </Box>
-
-            {/* RIGHT: USER AREA */}
-
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                flexShrink: 0,
-                ml: "auto",
-              }}
-            >
-              {/* TÊN NGƯỜI DÙNG */}
-
-              <Typography
-                sx={{
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  display: "block",
-                  maxWidth: 180,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                  {getShortName(user?.hoVaTen)}
-                </Box>
-
-                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                  {user?.hoVaTen || ""}
-                </Box>
-              </Typography>
-
-              {/* ICON TÀI KHOẢN */}
-              <Box
-                sx={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: "50%",
-                  bgcolor:
-                    user?.username?.trim().toLowerCase() === "thaipv"
-                      ? "#FEF3C7"
-                      : "#DBEAFE",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "1px solid",
-                  borderColor:
-                    user?.username?.trim().toLowerCase() === "thaipv"
-                      ? "#FCD34D"
-                      : "#93C5FD",
-                  boxShadow:
-                    user?.username?.trim().toLowerCase() === "thaipv"
-                      ? "0 2px 8px rgba(217,119,6,0.18)"
-                      : "0 2px 8px rgba(37,99,235,0.18)",
-                }}
-              >
-                {user?.username?.trim().toLowerCase() === "thaipv" ? (
-                  <AdminPanelSettingsIcon
-                    sx={{ color: "#B45309", fontSize: 21 }}
-                  />
-                ) : (
-                  <PersonIcon
-                    sx={{ color: "#1D4ED8", fontSize: 21 }}
-                  />
-                )}
-              </Box>
-
-              {/* MENU 9 Ô VUÔNG */}
-
-              <IconButton
-                onClick={handleMenuOpen}
-                sx={{
-                  color: "#fff",
-                  "&:hover": {
-                    bgcolor: "rgba(255,255,255,0.12)",
-                  },
-                }}
-              >
-                <AppsIcon />
-              </IconButton>
-            </Box>
-          </Toolbar>
-        </AppBar>
-
-        {/* ================================================= */}
-        {/* MENU TÀI KHOẢN */}
-        {/* ================================================= */}
-
-        <Menu
-          anchorEl={anchorEl}
-          open={openMenu}
-          onClose={handleMenuClose}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "right",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "right",
-          }}
-          PaperProps={{
-            sx: {
-              width: 200,
-              minWidth: 200,
-              overflow: "hidden",
-              boxShadow: "0 12px 35px rgba(0,0,0,0.18)",
-              borderRadius: 2,
-              p: 0,
-            },
-          }}
-        >
-          {/* HEADER */}
-
-          <Box
-            sx={{
-              px: 2,
-              py: 1.5,
-              bgcolor: "#fff",
-              fontWeight: 600,
-              fontSize: 14,
-              borderBottom: "1px solid #eee",
-              color: "#d32f2f",
-            }}
-          >
-            TÀI KHOẢN
-          </Box>
-
-          {/* CẬP NHẬT THÔNG TIN */}
-
-          <Box
-            onClick={handleOpenProfile}
-            sx={{
-              px: 2,
-              py: 1.5,
-              cursor: "pointer",
-              bgcolor: "#f5f7fa",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              transition: "0.2s",
-              "&:hover": {
-                bgcolor: "#e9eef5",
-              },
-            }}
-          >
-            <PersonIcon sx={{ fontSize: 18, color: "#1976d2" }} />
-            Cập nhật thông tin
-          </Box>
-
-          {/* ĐỔI MẬT KHẨU */}
-
-          <Box
-            onClick={() => {
-              handleMenuClose();
-              setOpenChangePassword(true);
-            }}
-            sx={{
-              px: 2,
-              py: 1.5,
-              cursor: "pointer",
-              bgcolor: "#f5f7fa",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              transition: "0.2s",
-              "&:hover": {
-                bgcolor: "#e9eef5",
-              },
-            }}
-          >
-            <LockResetIcon sx={{ fontSize: 18, color: "#1976d2" }} />
-            Đổi mật khẩu
-          </Box>
-
-          {/* ĐƯỜNG PHÂN CÁCH */}
-
-          <Box
-            sx={{
-              height: "1px",
-              bgcolor: "#e5e7eb",
-              mx: 1,
-            }}
+      <WorksheetProvider>
+        <>
+          <AppHeader
+            user={user}
+            getShortName={getShortName}
+            setOpenLogo={setOpenLogo}
+            handleMenuOpen={handleMenuOpen}
           />
 
-          {/* ĐĂNG XUẤT */}
+          {/* ================================================= */}
+          {/* MENU TÀI KHOẢN */}
+          {/* ================================================= */}
 
-          <Box
-            onClick={() => {
-              handleMenuClose();
-              handleLogout();
-            }}
-            sx={{
-              px: 2,
-              py: 1.5,
-              cursor: "pointer",
-              bgcolor: "#f5f7fa",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              transition: "0.2s",
-              "&:hover": {
-                bgcolor: "#fee2e2",
-              },
-            }}
-          >
-            <LogoutIcon sx={{ fontSize: 18, color: "#d32f2f" }} />
-            Đăng xuất
-          </Box>
-        </Menu>
+          <AccountMenu
+            anchorEl={anchorEl}
+            openMenu={openMenu}
+            handleMenuClose={handleMenuClose}
+            handleOpenProfile={handleOpenProfile}
+            setOpenChangePassword={setOpenChangePassword}
+            handleLogout={handleLogout}
+          />
 
-        {/* ================================================= */}
-        {/* DIALOG CẬP NHẬT THÔNG TIN */}
-        {/* ================================================= */}
+          {/* ================================================= */}
+          {/* DIALOG CẬP NHẬT THÔNG TIN */}
+          {/* ================================================= */}
 
-        {/* DIALOG CẬP NHẬT THÔNG TIN */}
-        <UpdateProfileDialog
-          open={openProfile}
-          onClose={() => setOpenProfile(false)}
-          user={user}
-          profileData={profileData}
-          setProfileData={setProfileData}
-          loadingProfile={loadingProfile}
-          savingProfile={savingProfile}
-          profileError={profileError}
-          onSave={handleSaveProfile}
-        />
+          {/* DIALOG CẬP NHẬT THÔNG TIN */}
+          <UpdateProfileDialog
+            open={openProfile}
+            onClose={() => setOpenProfile(false)}
+            user={user}
+            profileData={profileData}
+            setProfileData={setProfileData}
+            loadingProfile={loadingProfile}
+            savingProfile={savingProfile}
+            profileError={profileError}
+            onSave={handleSaveProfile}
+          />
 
-        {/* ================================================= */}
-        {/* DIALOG ĐỔI MẬT KHẨU */}
-        {/* ================================================= */}
+          {/* ================================================= */}
+          {/* DIALOG ĐỔI MẬT KHẨU */}
+          {/* ================================================= */}
 
-        <ChangePasswordDialog
-          open={openChangePassword}
-          onClose={() => setOpenChangePassword(false)}
-          username={user?.username}
-        />
+          <ChangePasswordDialog
+            open={openChangePassword}
+            onClose={() => setOpenChangePassword(false)}
+            username={user?.username}
+          />
 
-        {/* ================================================= */}
-        {/* PHÓNG TO LOGO */}
-        {/* ================================================= */}
+          {/* ================================================= */}
+          {/* PHÓNG TO LOGO */}
+          {/* ================================================= */}
 
-        {openLogo && (
-          <Box
-            onClick={() => setOpenLogo(false)}
-            sx={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              bgcolor: "rgba(0,0,0,0.6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              zIndex: 2000,
-              cursor: "pointer",
-            }}
-          >
+          {openLogo && (
             <Box
+              onClick={() => setOpenLogo(false)}
               sx={{
-                width: "clamp(180px, 60vw, 320px)",
-                height: "clamp(180px, 60vw, 320px)",
-                bgcolor: "white",
-                borderRadius: "16px",
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                bgcolor: "rgba(0,0,0,0.6)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
-                animation: "zoomIn 0.3s ease",
+                zIndex: 2000,
+                cursor: "pointer",
               }}
             >
               <Box
-                component="img"
-                src="/Logo.png"
-                alt="Logo lớn"
                 sx={{
-                  maxWidth: "85%",
-                  maxHeight: "85%",
-                  objectFit: "contain",
+                  width: "clamp(180px, 60vw, 320px)",
+                  height: "clamp(180px, 60vw, 320px)",
+                  bgcolor: "white",
+                  borderRadius: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+                  animation: "zoomIn 0.3s ease",
                 }}
-              />
+              >
+                <Box
+                  component="img"
+                  src="/Logo.png"
+                  alt="Logo lớn"
+                  sx={{
+                    maxWidth: "85%",
+                    maxHeight: "85%",
+                    objectFit: "contain",
+                  }}
+                />
+              </Box>
             </Box>
+          )}
+
+          {/* ================================================= */}
+          {/* NỘI DUNG TOOLS */}
+          {/* ================================================= */}
+
+          <Box
+            sx={{
+              paddingTop: "48px",
+              minHeight: "100vh",
+              width: "100%",
+            }}
+          >
+            <Tools />
           </Box>
-        )}
-
-        {/* ================================================= */}
-        {/* NỘI DUNG TOOLS */}
-        {/* ================================================= */}
-
-        <Box
-          sx={{
-            paddingTop: "48px",
-            minHeight: "100vh",
-            width: "100%",
-          }}
-        >
-          <Tools />
-        </Box>
-      </>
+        </>
+      </WorksheetProvider>
     </StudentProvider>
   );
 }
