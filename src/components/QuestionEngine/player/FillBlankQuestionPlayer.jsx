@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -7,6 +6,16 @@ import {
   Paper,
 } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+
+// Hàm xáo trộn mảng (Fisher-Yates)
+const shuffleArray = (list) => {
+  const arr = [...list];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
 
 export default function FillBlankQuestionPlayer({
   question,
@@ -24,7 +33,6 @@ export default function FillBlankQuestionPlayer({
 
   // Tách câu hỏi theo dấu [...]
   const parts = String(question.question || "").split(/\[\.\.\.\]/);
-
   const blankCount = parts.length - 1;
 
   // Tạo thẻ từ đáp án đúng
@@ -48,8 +56,20 @@ export default function FillBlankQuestionPlayer({
     }))
     .filter((card) => card.text);
 
-  // Gộp thẻ đúng và thẻ nhiễu
-  const cards = [...correctCards, ...distractorCards];
+  // Biến kích hoạt xáo trộn lại khi nhấn "Làm lại"
+  const [shuffleSeed, setShuffleSeed] = useState(0);
+
+  const rawCardsKey = JSON.stringify([
+    ...correctCards.map((c) => c.text),
+    ...distractorCards.map((c) => c.text),
+  ]);
+
+  // Gộp thẻ đúng + thẻ nhiễu và đảo ngẫu nhiên vị trí
+  const cards = useMemo(() => {
+    const combined = [...correctCards, ...distractorCards];
+    return shuffleArray(combined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question?.id, question?.question, rawCardsKey, shuffleSeed]);
 
   const [placedCards, setPlacedCards] = useState(
     Array(blankCount).fill(null)
@@ -60,7 +80,6 @@ export default function FillBlankQuestionPlayer({
 
   // Khôi phục trạng thái khi nhận câu trả lời từ bên ngoài
   const answerKey = JSON.stringify(answer);
-  const cardsKey = JSON.stringify(cards);
 
   useEffect(() => {
     const userAnswers = Array.isArray(answer)
@@ -76,7 +95,7 @@ export default function FillBlankQuestionPlayer({
 
         if (!value) return null;
 
-        const card = correctCards.find(
+        const card = cards.find(
           (item) =>
             !usedCards.has(item.id) &&
             item.text.toLowerCase() === value.toLowerCase()
@@ -91,7 +110,8 @@ export default function FillBlankQuestionPlayer({
 
     setPlacedCards(restored);
     setSelectedCard(null);
-  }, [answerKey, cardsKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answerKey, rawCardsKey]);
 
   // Cập nhật câu trả lời cho hệ thống chấm điểm
   const updateAnswer = (nextPlacedCards) => {
@@ -102,7 +122,7 @@ export default function FillBlankQuestionPlayer({
 
         if (!cardId) return "";
 
-        const card = correctCards.find(
+        const card = cards.find(
           (item) => item.id === cardId
         );
 
@@ -119,14 +139,11 @@ export default function FillBlankQuestionPlayer({
 
     const next = [...placedCards];
 
-    // Nếu thẻ đang nằm ở chỗ khác thì lấy thẻ ra trước
     const oldIndex = next.indexOf(cardId);
-
     if (oldIndex !== -1) {
       next[oldIndex] = null;
     }
 
-    // Thay thẻ đang có trong ô đích
     next[blankIndex] = cardId;
 
     setPlacedCards(next);
@@ -149,10 +166,7 @@ export default function FillBlankQuestionPlayer({
   // Chọn thẻ bằng cách nhấn chuột hoặc chạm
   const handleSelectCard = (cardId) => {
     if (disabled) return;
-
-    setSelectedCard(
-      selectedCard === cardId ? null : cardId
-    );
+    setSelectedCard(selectedCard === cardId ? null : cardId);
   };
 
   // Nhấn vào ô trống để đặt thẻ đã chọn
@@ -172,47 +186,37 @@ export default function FillBlankQuestionPlayer({
   // Kéo thả bằng chuột
   const handleDragStart = (event, cardId) => {
     if (disabled) return;
-
     setDraggingCard(cardId);
     event.dataTransfer.setData("text/plain", cardId);
     event.dataTransfer.effectAllowed = "move";
   };
 
-  // Thả thẻ vào chỗ trống
   const handleDropOnBlank = (event, blankIndex) => {
     event.preventDefault();
-
     if (disabled) return;
 
     const cardId = event.dataTransfer.getData("text/plain");
-
     if (cardId) {
       placeCard(cardId, blankIndex);
     }
-
     setDraggingCard(null);
   };
 
-  // Kéo thẻ trở lại danh sách
   const handleDropOnBank = (event) => {
     event.preventDefault();
-
     if (disabled) return;
 
     const cardId = event.dataTransfer.getData("text/plain");
-
     if (!cardId) return;
 
     const index = placedCards.indexOf(cardId);
-
     if (index !== -1) {
       removeCard(index);
     }
-
     setDraggingCard(null);
   };
 
-  // Làm lại toàn bộ câu hỏi
+  // Làm lại toàn bộ câu hỏi và đảo lại vị trí thẻ từ
   const handleReset = () => {
     if (disabled) return;
 
@@ -221,206 +225,191 @@ export default function FillBlankQuestionPlayer({
     setPlacedCards(next);
     setSelectedCard(null);
     setDraggingCard(null);
+    setShuffleSeed((prev) => prev + 1);
 
     onChange(Array(blankAnswerSets.length).fill(""));
   };
 
-  // Những thẻ chưa được sử dụng
+  // Những thẻ chưa được sử dụng (giữ nguyên thứ tự đã đảo)
   const availableCards = cards.filter(
     (card) => !placedCards.includes(card.id)
   );
 
-  
-return (
-  <Box sx={{ mt: 2 }}>
-    {/* Nội dung câu hỏi và các ô thả */}
-    <Typography
-      component="div"
-      fontWeight={600}
-      lineHeight={2.8}
-      sx={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: 0.5,
-        fontSize: 16,
-        color: "#1e293b",
-      }}
-    >
-      {parts.map((part, index) => (
-        <React.Fragment key={index}>
-          <Box
-            component="span"
-            sx={{ whiteSpace: "pre-wrap" }}
-          >
-            {part}
-          </Box>
-
-          {index < blankCount && (
-            <Box
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) =>
-                handleDropOnBlank(event, index)
-              }
-              onClick={() => handleBlankClick(index)}
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minWidth: 125,
-                minHeight: 38,
-                px: 1.5,
-                mx: 0.5,
-                border: "2px dashed",
-                borderColor:
-                  placedCards[index] !== null
-                    ? "#16a34a"
-                    : selectedCard !== null
-                      ? "#2563eb"
-                      : "#94a3b8",
-                borderRadius: 2,
-                bgcolor:
-                  placedCards[index] !== null
-                    ? "#f0fdf4"
-                    : selectedCard !== null
-                      ? "#eff6ff"
-                      : "#f8fafc",
-                color:
-                  placedCards[index] !== null
-                    ? "#15803d"
-                    : "#94a3b8",
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: disabled ? "default" : "pointer",
-                userSelect: "none",
-                transition: "all 0.2s",
-              }}
-            >
-              {placedCards[index] !== null
-                ? cards.find(
-                    (card) => card.id === placedCards[index]
-                  )?.text
-                : "Thả từ vào đây"}
-            </Box>
-          )}
-        </React.Fragment>
-      ))}
-    </Typography>
-
-    {/* Khu vực thẻ từ */}
-    <Paper
-      variant="outlined"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={handleDropOnBank}
-      sx={{
-        mt: 1,
-        mb: 1,
-        p: 1,
-        borderRadius: 2,
-        bgcolor: "#f8fafc",
-        borderColor: "#cbd5e1",
-      }}
-    >
-      {/* Tiêu đề và nút làm lại cùng hàng */}
-      <Box
+  return (
+    <Box sx={{ mt: 2 }}>
+      {/* Nội dung câu hỏi và các ô thả */}
+      <Typography
+        component="div"
+        fontWeight={600}
+        lineHeight={2.6}
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 1,
-          mb: 0.75,
+          display: "block",
+          fontSize: 16,
+          color: "#1e293b",
+          wordBreak: "break-word",
         }}
       >
-        <Typography
-          fontWeight={800}
-          fontSize={12}
-          color="text.secondary"
-        >
-          KÉO THẺ TỪ VÀO CHỖ TRỐNG
-        </Typography>
+        {parts.map((part, index) => (
+          <React.Fragment key={index}>
+            <Box component="span" sx={{ whiteSpace: "pre-wrap" }}>
+              {part}
+            </Box>
 
-        <Button
-          size="small"
-          variant="outlined"
-          color="warning"
-          startIcon={<RestartAltIcon />}
-          onClick={handleReset}
-          disabled={
-            disabled ||
-            placedCards.every((item) => item === null)
-          }
+            {index < blankCount && (
+              <Box
+                component="span"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => handleDropOnBlank(event, index)}
+                onClick={() => handleBlankClick(index)}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  verticalAlign: "middle",
+                  minWidth: 92,
+                  height: 34,
+                  px: 1.25,
+                  mx: 0.5,
+                  my: 0.25,
+                  border: "2px dashed",
+                  borderColor:
+                    placedCards[index] !== null
+                      ? "#16a34a"
+                      : selectedCard !== null
+                        ? "#2563eb"
+                        : "#94a3b8",
+                  borderRadius: 2,
+                  bgcolor:
+                    placedCards[index] !== null
+                      ? "#f0fdf4"
+                      : selectedCard !== null
+                        ? "#eff6ff"
+                        : "#f8fafc",
+                  color:
+                    placedCards[index] !== null ? "#15803d" : "#94a3b8",
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  lineHeight: 1,
+                  cursor: disabled ? "default" : "pointer",
+                  userSelect: "none",
+                  transition: "all 0.2s",
+                }}
+              >
+                {placedCards[index] !== null
+                  ? cards.find((card) => card.id === placedCards[index])?.text
+                  : "Thả từ vào đây"}
+              </Box>
+            )}
+          </React.Fragment>
+        ))}
+      </Typography>
+
+      {/* Khu vực thẻ từ */}
+      <Paper
+        variant="outlined"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDropOnBank}
+        sx={{
+          mt: 1,
+          mb: 1,
+          p: 1,
+          borderRadius: 2,
+          bgcolor: "#f8fafc",
+          borderColor: "#cbd5e1",
+        }}
+      >
+        <Box
           sx={{
-            textTransform: "none",
-            fontWeight: 700,
-            borderRadius: 2,
-            py: 0.3,
-            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            mb: 0.75,
           }}
         >
-          Làm lại
-        </Button>
-      </Box>
-
-      {/* Danh sách thẻ từ */}
-      <Box
-        sx={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 0.75,
-          minHeight: 30,
-          alignItems: "center",
-        }}
-      >
-        {availableCards.length > 0 ? (
-          availableCards.map((card) => (
-            <Paper
-              key={card.id}
-              elevation={0}
-              draggable={!disabled}
-              onDragStart={(event) =>
-                handleDragStart(event, card.id)
-              }
-              onDragEnd={() => setDraggingCard(null)}
-              onClick={() => handleSelectCard(card.id)}
-              sx={{
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 2,
-                border: "1px solid",
-                borderColor:
-                  selectedCard === card.id
-                    ? "#1565c0"
-                    : "#90caf9",
-                bgcolor:
-                  selectedCard === card.id
-                    ? "#dbeafe"
-                    : "#fff",
-                color: "#1565c0",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: disabled ? "default" : "grab",
-                userSelect: "none",
-                opacity: draggingCard === card.id ? 0.4 : 1,
-                "&:active": {
-                  cursor: "grabbing",
-                },
-              }}
-            >
-              {card.text}
-            </Paper>
-          ))
-        ) : (
           <Typography
-            color="text.secondary"
+            fontWeight={800}
             fontSize={12}
-            fontStyle="italic"
+            color="text.secondary"
           >
-            Đã sử dụng hết thẻ từ
+            KÉO THẺ TỪ VÀO CHỖ TRỐNG
           </Typography>
-        )}
-      </Box>
-    </Paper>
-  </Box>
-);
 
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            startIcon={<RestartAltIcon />}
+            onClick={handleReset}
+            disabled={
+              disabled ||
+              placedCards.every((item) => item === null)
+            }
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+              borderRadius: 2,
+              py: 0.3,
+              flexShrink: 0,
+            }}
+          >
+            Làm lại
+          </Button>
+        </Box>
+
+        {/* Danh sách thẻ từ đã đảo vị trí */}
+        <Box
+          sx={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 0.75,
+            minHeight: 30,
+            alignItems: "center",
+          }}
+        >
+          {availableCards.length > 0 ? (
+            availableCards.map((card) => (
+              <Paper
+                key={card.id}
+                elevation={0}
+                draggable={!disabled}
+                onDragStart={(event) => handleDragStart(event, card.id)}
+                onDragEnd={() => setDraggingCard(null)}
+                onClick={() => handleSelectCard(card.id)}
+                sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor:
+                    selectedCard === card.id ? "#1565c0" : "#90caf9",
+                  bgcolor:
+                    selectedCard === card.id ? "#dbeafe" : "#fff",
+                  color: "#1565c0",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: disabled ? "default" : "grab",
+                  userSelect: "none",
+                  opacity: draggingCard === card.id ? 0.4 : 1,
+                  "&:active": {
+                    cursor: "grabbing",
+                  },
+                }}
+              >
+                {card.text}
+              </Paper>
+            ))
+          ) : (
+            <Typography
+              color="text.secondary"
+              fontSize={12}
+              fontStyle="italic"
+            >
+              Đã sử dụng hết thẻ từ
+            </Typography>
+          )}
+        </Box>
+      </Paper>
+    </Box>
+  );
 }

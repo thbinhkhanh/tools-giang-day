@@ -216,6 +216,71 @@ const isControlElementOnHeader = (el) => {
   return false;
 };
 
+// Icon người dùng cho "Họ và tên" tại (x, centerY)
+const drawNameUserIcon = (pdf, x, centerY, size = 4.6) => {
+  pdf.saveGraphicsState();
+  pdf.setDrawColor(...COLORS.blueTitle);
+  pdf.setLineWidth(0.38);
+
+  const headR = size * 0.21;
+  const headY = centerY - size * 0.22;
+  const cx = x + size * 0.5;
+
+  pdf.circle(cx, headY, headR, "S");
+
+  const bodyBottomY = centerY + size * 0.36;
+  const halfSpan = size * 0.36;
+
+  pdf.lines(
+    [
+      [halfSpan * 0.45, -size * 0.14],
+      [halfSpan * 1.1, 0],
+      [halfSpan * 0.45, size * 0.14],
+    ],
+    cx - halfSpan,
+    bodyBottomY,
+    [1, 1],
+    "S",
+    false
+  );
+
+  pdf.restoreGraphicsState();
+};
+
+// Icon phòng học / ngôi nhà cho "Lớp" tại (x, centerY)
+const drawClassRoomIcon = (pdf, x, centerY, size = 4.6) => {
+  pdf.saveGraphicsState();
+  pdf.setDrawColor(...COLORS.orangeBanner);
+  pdf.setLineWidth(0.36);
+
+  const cx = x + size * 0.5;
+  const roofPeakY = centerY - size * 0.36;
+  const wallTopY = centerY - size * 0.04;
+  const wallBottomY = centerY + size * 0.34;
+  const halfWall = size * 0.36;
+  const halfRoof = size * 0.48;
+
+  pdf.lines(
+    [
+      [halfRoof, roofPeakY - wallTopY],
+      [halfRoof, wallTopY - roofPeakY],
+    ],
+    cx - halfRoof,
+    wallTopY,
+    [1, 1],
+    "S",
+    false
+  );
+
+  pdf.rect(cx - halfWall, wallTopY, halfWall * 2, wallBottomY - wallTopY, "S");
+
+  const doorW = size * 0.22;
+  const doorH = (wallBottomY - wallTopY) * 0.52;
+  pdf.rect(cx - doorW / 2, wallBottomY - doorH, doorW, doorH, "S");
+
+  pdf.restoreGraphicsState();
+};
+
 // ================== HÀM XUẤT PDF ==================
 
 export const exportPhieuHocTapPDF = async ({
@@ -239,6 +304,13 @@ export const exportPhieuHocTapPDF = async ({
         fontList
       );
     }
+
+    const hasBoldStyleOnBaseFont = Boolean(
+      fontList?.[FONT_FAMILY]?.includes("bold")
+    );
+    const boldFontAlias = Object.keys(fontList || {}).find((name) =>
+      /bold/i.test(name)
+    );
 
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -267,9 +339,18 @@ export const exportPhieuHocTapPDF = async ({
       bold = false,
       color = COLORS.textDark
     ) => {
-      const style =
-        bold && fontList?.[FONT_FAMILY]?.includes("bold") ? "bold" : "normal";
-      pdf.setFont(FONT_FAMILY, style);
+      if (bold) {
+        if (hasBoldStyleOnBaseFont) {
+          pdf.setFont(FONT_FAMILY, "bold");
+        } else if (boldFontAlias) {
+          pdf.setFont(boldFontAlias, "normal");
+        } else {
+          pdf.setFont(FONT_FAMILY, "bold");
+        }
+      } else {
+        pdf.setFont(FONT_FAMILY, "normal");
+      }
+
       pdf.setFontSize(fontSize);
       pdf.setTextColor(color[0], color[1], color[2]);
     };
@@ -341,7 +422,7 @@ export const exportPhieuHocTapPDF = async ({
       y += blockHeight + gapAfter;
     };
 
-    // ================== TRANG ĐẦU: HÌNH TIÊU ĐỀ NGOÀI KHUNG -> THANH CAM MỞ KHUNG ==================
+    // ================== TRANG ĐẦU: HÌNH TIÊU ĐỀ -> THÔNG TIN HỌC SINH (NGOÀI KHUNG) -> THANH CAM MỞ KHUNG ==================
 
     y = frameY;
 
@@ -372,12 +453,43 @@ export const exportPhieuHocTapPDF = async ({
             headerWidth,
             headerHeight
           );
-          y += headerHeight + 3;
+          y += headerHeight;
         }
       } catch (error) {
         console.warn("Không chụp được hình header:", error);
       }
     }
+
+    // Dòng thông tin học sinh cùng hàng, nằm dưới nhóm tiêu đề nhưng bên ngoài khung bao
+    const studentMt = 5.5;
+    const studentMb = 7.5;
+    const studentFontSize = 13.5;
+    const studentLineHeight = getLineHeightMm(studentFontSize);
+    const iconSize = 4.6;
+    const iconGap = 1.8;
+
+    y += studentMt;
+
+    setFontStyle(studentFontSize, false, COLORS.textDark);
+
+    const nameLabel = `Họ và tên: ${"_".repeat(29)}`;
+    const classLabel = `Lớp:${"_".repeat(7)}`;
+    const classTextWidth = pdf.getTextWidth(classLabel);
+    const rowCenterY = y + studentLineHeight / 2;
+
+    const nameIconX = frameX + 2;
+    const nameTextX = nameIconX + iconSize + iconGap;
+
+    const classIconX = frameX + frameWidth - classTextWidth - iconSize - iconGap - 2;
+    const classTextX = classIconX + iconSize + iconGap;
+
+    drawNameUserIcon(pdf, nameIconX, rowCenterY, iconSize);
+    pdf.text(nameLabel, nameTextX, y, { baseline: "top" });
+
+    drawClassRoomIcon(pdf, classIconX, rowCenterY, iconSize);
+    pdf.text(classLabel, classTextX, y, { baseline: "top" });
+
+    y += studentLineHeight + studentMb;
 
     frameStartY = y;
     y = drawOrangeBanner(frameStartY, bannerTitle, weekText);
@@ -440,11 +552,11 @@ export const exportPhieuHocTapPDF = async ({
         const optLineHeight = getLineHeightMm(optFontSize);
         const boxPadX = 3.5;
         const boxPadY = 2.8;
-        const iconSize = 3.4;
-        const iconGap = 2.5;
-        const textStartX = contentX + boxPadX + iconSize + iconGap;
+        const boxIconSize = 3.4;
+        const boxIconGap = 2.5;
+        const textStartX = contentX + boxPadX + boxIconSize + boxIconGap;
         const textMaxWidth =
-          contentWidth - (boxPadX + iconSize + iconGap + boxPadX);
+          contentWidth - (boxPadX + boxIconSize + boxIconGap + boxPadX);
 
         let letterIdx = 0;
 
@@ -460,7 +572,7 @@ export const exportPhieuHocTapPDF = async ({
           letterIdx += 1;
 
           const displayLine = text ? `${prefix} ${text}` : prefix;
-          setFontStyle(optFontSize, true, COLORS.textDark);
+          setFontStyle(optFontSize, false, COLORS.textDark);
           const lines = pdf.splitTextToSize(displayLine, textMaxWidth);
           const textBlockHeight = lines.length * optLineHeight;
           const boxHeight = Math.max(textBlockHeight + boxPadY * 2, 8.5);
@@ -478,22 +590,22 @@ export const exportPhieuHocTapPDF = async ({
 
           if (isSingle) {
             pdf.circle(
-              contentX + boxPadX + iconSize / 2,
+              contentX + boxPadX + boxIconSize / 2,
               iconCenterY,
-              iconSize / 2,
+              boxIconSize / 2,
               "S"
             );
           } else {
             pdf.rect(
               contentX + boxPadX,
-              iconCenterY - iconSize / 2,
-              iconSize,
-              iconSize,
+              iconCenterY - boxIconSize / 2,
+              boxIconSize,
+              boxIconSize,
               "S"
             );
           }
 
-          setFontStyle(optFontSize, true, COLORS.textDark);
+          setFontStyle(optFontSize, false, COLORS.textDark);
           const textTopY =
             lines.length === 1
               ? y + (boxHeight - optLineHeight) / 2
@@ -796,7 +908,7 @@ export const exportPhieuHocTapPDF = async ({
           }
         }
 
-        const fbFontSize = 10.5;
+        const fbFontSize = 11;
         const fbLineHeight = getLineHeightMm(fbFontSize);
         const slotWidth = 34;
         const slotHeight = 7.2;

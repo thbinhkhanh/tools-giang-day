@@ -1043,6 +1043,134 @@ useEffect(() => {
   setWorksheet,
 ]);
 
+  // ======================================================
+  // TẢI LẠI ĐỀ MỚI NHẤT TỪ FIRESTORE SAU KHI SOẠN ĐỀ
+  // ======================================================
+
+  const reloadWorksheetFromFirestore = useCallback(async () => {
+    try {
+      if (!worksheetId || !studentClass || !subject || !selectedWeek) {
+        showMessage("Thiếu thông tin phiếu học tập.", "warning");
+        return false;
+      }
+
+      const currentUser = JSON.parse(
+        localStorage.getItem("tools_user") || "{}"
+      );
+
+      const username = String(
+        currentUser?.username || ""
+      ).trim().toLowerCase();
+
+      if (!username) {
+        showMessage("Không xác định được tài khoản.", "error");
+        return false;
+      }
+
+      const worksheetRef = doc(
+        db,
+        "USERS",
+        username,
+        "PHIEU_HOC_TAP",
+        subject,
+        "DANHSACH",
+        worksheetId
+      );
+
+      // BẮT BUỘC ĐỌC LẠI TỪ FIRESTORE
+      const worksheetSnapshot = await getDoc(worksheetRef);
+
+      if (!worksheetSnapshot.exists()) {
+        showMessage("Không tìm thấy phiếu học tập sau khi cập nhật.", "error");
+        return false;
+      }
+
+      const worksheetData = worksheetSnapshot.data();
+
+      // CẬP NHẬT CONTEXT VÀ LOCAL STORAGE
+      setWorksheet({
+        selectedClass: studentClass,
+        subject,
+        selectedWeek,
+        type: "phiếu học tập",
+        worksheetId: worksheetSnapshot.id,
+        data: worksheetData,
+      });
+
+      // CẬP NHẬT THÔNG TIN PHIẾU
+      setWorksheetId(worksheetSnapshot.id);
+
+      setWorksheetInfo({
+        title: "PHIẾU HỌC TẬP",
+        lessonTitle: worksheetData.lessonTitle || "",
+        subtitle: worksheetData.subtitle || "",
+        sectionTitle:
+          worksheetData.sectionTitle ||
+          "BÀI TẬP TRẮC NGHIỆM",
+      });
+
+      // CHUẨN HÓA CÂU HỎI MỚI
+      const rawQuestions = Array.isArray(worksheetData.questions)
+        ? worksheetData.questions
+        : [];
+
+      const normalizedQuestions = rawQuestions
+        .filter(
+          (question) =>
+            question &&
+            typeof question === "object" &&
+            String(question.question || "").trim()
+        )
+        .map((question) => normalizeQuestion(question));
+
+      setQuestions(normalizedQuestions);
+
+      // RESET ĐÁP ÁN THEO ĐỀ MỚI
+      setAnswers(createInitialAnswers(normalizedQuestions));
+
+      // ĐƯA PHIẾU VỀ TRẠNG THÁI CHƯA LÀM
+      setStarted(false);
+      setSubmitted(false);
+      setScore(0);
+      setStartTime(null);
+
+      submittingRef.current = false;
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setTimeLeft(timeLimitMinutes * 60);
+
+      /*showMessage(
+        "Đã tải đề mới nhất từ Firestore.",
+        "success"
+      );*/
+
+      return true;
+
+    } catch (error) {
+      console.error("Lỗi tải lại phiếu học tập:", error);
+
+      showMessage(
+        "Không thể tải lại đề từ Firestore.",
+        "error"
+      );
+
+      return false;
+    }
+  }, [
+    worksheetId,
+    studentClass,
+    subject,
+    selectedWeek,
+    timeLimitMinutes,
+    setWorksheet,
+    createInitialAnswers,
+    showMessage,
+  ]);
+
 
 
   // ======================================================
@@ -1387,94 +1515,94 @@ useEffect(() => {
 
         
       <Box
-  ref={headerBoxRef}
-  sx={{
-    position: "relative",
-    overflow: "hidden",
-    isolation: "isolate",
+        ref={headerBoxRef}
+          sx={{
+            position: "relative",
+            overflow: "hidden",
+            isolation: "isolate",
 
-    // NỀN MẶC ĐỊNH HOẶC HÌNH NỀN ĐƯỢC CHỌN
-    ...(headerBackground
-      ? {
-          backgroundColor: "#0288cc",
-          backgroundImage: `
-            linear-gradient(
-              rgba(0, 55, 100, 0.30),
-              rgba(0, 55, 100, 0.30)
-            ),
-            url("${headerBackground}")
-          `,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundRepeat: "no-repeat",
-        }
-      : {
-          background:
-            "linear-gradient(120deg, #38bdf8 0%, #0288cc 50%, #0ea5e9 100%)",
-          backgroundSize: "200% 200%",
-          animation: "headerGradientMove 10s ease infinite",
-        }),
+            // NỀN MẶC ĐỊNH HOẶC HÌNH NỀN ĐƯỢC CHỌN
+            ...(headerBackground
+              ? {
+                  backgroundColor: "#0288cc",
+                  backgroundImage: `
+                    linear-gradient(
+                      rgba(0, 55, 100, 0.30),
+                      rgba(0, 55, 100, 0.30)
+                    ),
+                    url("${headerBackground}")
+                  `,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+              : {
+                  background:
+                    "linear-gradient(120deg, #38bdf8 0%, #0288cc 50%, #0ea5e9 100%)",
+                  backgroundSize: "200% 200%",
+                  animation: "headerGradientMove 10s ease infinite",
+                }),
 
-    color: "#fff",
-    textAlign: "center",
-    px: { xs: 2, sm: 4 },
-    py: { xs: 1.2, sm: 1.8 },
-    borderRadius: "14px",
-    boxShadow: "0 5px 16px rgba(2, 136, 204, 0.2)",
+            color: "#fff",
+            textAlign: "center",
+            px: { xs: 2, sm: 4 },
+            py: { xs: 1.2, sm: 1.8 },
+            borderRadius: "14px",
+            boxShadow: "0 5px 16px rgba(2, 136, 204, 0.2)",
 
-    "@keyframes headerGradientMove": {
-      "0%": { backgroundPosition: "0% 50%" },
-      "50%": { backgroundPosition: "100% 50%" },
-      "100%": { backgroundPosition: "0% 50%" },
-    },
+            "@keyframes headerGradientMove": {
+              "0%": { backgroundPosition: "0% 50%" },
+              "50%": { backgroundPosition: "100% 50%" },
+              "100%": { backgroundPosition: "0% 50%" },
+            },
 
-    "@keyframes headerTitleIn": {
-      "0%": {
-        opacity: 0,
-        transform: "translateY(15px)",
-      },
-      "100%": {
-        opacity: 1,
-        transform: "translateY(0)",
-      },
-    },
+            "@keyframes headerTitleIn": {
+              "0%": {
+                opacity: 0,
+                transform: "translateY(15px)",
+              },
+              "100%": {
+                opacity: 1,
+                transform: "translateY(0)",
+              },
+            },
 
-    "@keyframes headerLineIn": {
-      "0%": {
-        opacity: 0,
-        transform: "scaleX(0)",
-      },
-      "100%": {
-        opacity: 1,
-        transform: "scaleX(1)",
-      },
-    },
+            "@keyframes headerLineIn": {
+              "0%": {
+                opacity: 0,
+                transform: "scaleX(0)",
+              },
+              "100%": {
+                opacity: 1,
+                transform: "scaleX(1)",
+              },
+            },
 
-    "@keyframes headerDecorationFloat": {
-      "0%, 100%": {
-        transform: "translateY(0) rotate(0deg)",
-      },
-      "50%": {
-        transform: "translateY(9px) rotate(5deg)",
-      },
-    },
+            "@keyframes headerDecorationFloat": {
+              "0%, 100%": {
+                transform: "translateY(0) rotate(0deg)",
+              },
+              "50%": {
+                transform: "translateY(9px) rotate(5deg)",
+              },
+            },
 
-    "@keyframes headerDiamond": {
-      "0%, 100%": {
-        transform: "rotate(45deg) scale(1)",
-      },
-      "50%": {
-        transform: "rotate(135deg) scale(1.15)",
-      },
-    },
+            "@keyframes headerDiamond": {
+              "0%, 100%": {
+                transform: "rotate(45deg) scale(1)",
+              },
+              "50%": {
+                transform: "rotate(135deg) scale(1.15)",
+              },
+            },
 
-    "@media (prefers-reduced-motion: reduce)": {
-      "& *": {
-        animation: "none !important",
-      },
-    },
-  }}
->
+            "@media (prefers-reduced-motion: reduce)": {
+              "& *": {
+                animation: "none !important",
+              },
+            },
+          }}
+        >
         {/* HOA VĂN GÓC TRÁI */}
 
         <Box
@@ -1931,10 +2059,12 @@ useEffect(() => {
 
       {/* THANH ĐIỀU KHIỂN CỐ ĐỊNH CUỐI MÀN HÌNH */}
 
+      {/* THANH ĐIỀU KHIỂN CỐ ĐỊNH CUỐI MÀN HÌNH */}
+
       <Box
         sx={{
           position: "fixed",
-          bottom: 0,
+          bottom: { xs: 5, sm: 10 },
           left: 0,
           right: 0,
           zIndex: 1200,
@@ -1943,11 +2073,7 @@ useEffect(() => {
           alignItems: "center",
           px: 1.5,
           py: 0.7,
-          backgroundColor: "rgba(255,255,255,0.97)",
-          borderTop: "1px solid #e2e8f0",
-          boxShadow: "0 -2px 10px rgba(15,23,42,0.08)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          backgroundColor: "transparent",
         }}
       >
         <Box
@@ -2059,13 +2185,10 @@ useEffect(() => {
         selectedClass={studentClass}
         subject={subject}
         documentId={worksheetId}
-        onSaved={() => {
+        onSaved={async () => {
           setOpenSoanDialog(false);
 
-          showMessage(
-            "Đã lưu phiếu học tập.",
-            "success"
-          );
+          await reloadWorksheetFromFirestore();
         }}
       />
 

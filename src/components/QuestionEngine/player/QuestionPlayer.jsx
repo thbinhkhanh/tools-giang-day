@@ -160,19 +160,20 @@ export default function QuestionPlayer({
             sx={{ mt: 3 }}
         >
             <Button
-            fullWidth
-            variant="contained"
-            color="primary"
-            startIcon={<CheckCircleOutlineIcon />}
-            disabled={result !== null}
-            onClick={handleCheck}
-            sx={{
-                py: 1.2,
-                borderRadius: 2,
-                fontWeight: 700,
-            }}
-            >
-            KIỂM TRA ĐÁP ÁN
+                variant="contained"
+                color="primary"
+                startIcon={<CheckCircleOutlineIcon />}
+                disabled={result !== null}
+                onClick={handleCheck}
+                sx={{
+                    width: "auto",
+                    px: 2.5,
+                    py: 1.2,
+                    borderRadius: 2,
+                    fontWeight: 700,
+                }}
+                >
+                KIỂM TRA ĐÁP ÁN
             </Button>
 
             {result === false && (
@@ -193,64 +194,66 @@ export default function QuestionPlayer({
 
       {result !== null && (
         <Paper
-            elevation={0}
-            sx={{
-                mt: 1.5,
-                p: 1.25,
-                borderRadius: 1.5,
-                bgcolor: result ? "#44844a" : "#FFF3E0",
-                border: "1px solid",
-                borderColor: result ? "#81C784" : "#FFCC80",
-            }}
-            >
-            <Stack direction="row" spacing={0.75} alignItems="center">
-                {result ? (
-                <CheckCircleOutlineIcon
-                    color="success"
-                    sx={{ fontSize: 19 }}
-                />
-                ) : (
-                <Typography fontSize={17}>❌</Typography>
-                )}
+  elevation={0}
+  sx={{
+    display: result ? "inline-block" : "block",
+    width: result ? "fit-content" : "100%",
+    maxWidth: "100%",
+    mt: 1.5,
+    p: 1.25,
+    borderRadius: 1.5,
+    border: "1px solid",
+    borderColor: result ? "#81C784" : "#FFCC80",
+  }}
+>
+  <Stack direction="row" spacing={0.75} alignItems="center">
+    {result ? (
+      <CheckCircleOutlineIcon
+        color="success"
+        sx={{ fontSize: 19 }}
+      />
+    ) : (
+      <Typography fontSize={17}>❌</Typography>
+    )}
 
-                <Typography
-                fontSize={13}
-                fontWeight={700}
-                color={result ? "success.dark" : "warning.dark"}
-                >
-                {result
-                    ? "Chính xác! Em trả lời rất tốt."
-                    : "Chưa chính xác! Em hãy xem đáp án đúng nhé."}
-                </Typography>
-            </Stack>
+    <Typography
+      fontSize={13}
+      fontWeight={700}
+      color={result ? "success.main" : "warning.dark"}
+    >
+      {result
+        ? "Chính xác! Em trả lời rất tốt."
+        : "Chưa chính xác! Em hãy xem đáp án đúng nhé."}
+    </Typography>
+  </Stack>
 
-            {!result && (
-                <>
-                <Divider sx={{ my: 1 }} />
+  {!result && (
+    <>
+      <Divider sx={{ my: 1 }} />
 
-                <Typography
-                    fontSize={12.5}
-                    fontWeight={700}
-                    color="success.dark"
-                    sx={{ mb: 0.5 }}
-                >
-                    Đáp án đúng:
-                </Typography>
+      <Typography
+        fontSize={12.5}
+        fontWeight={700}
+        color="success.dark"
+        sx={{ mb: 0.5 }}
+      >
+        Đáp án đúng:
+      </Typography>
 
-                <Typography
-                    fontSize={13}
-                    color="text.primary"
-                    sx={{
-                    whiteSpace: "pre-line",
-                    fontWeight: 600,
-                    lineHeight: 1.5,
-                    }}
-                >
-                    {correctAnswerText}
-                </Typography>
-                </>
-            )}
-            </Paper>
+      <Typography
+        fontSize={13}
+        color="text.primary"
+        sx={{
+          whiteSpace: "pre-line",
+          fontWeight: 600,
+          lineHeight: 1.5,
+        }}
+      >
+        {correctAnswerText}
+      </Typography>
+    </>
+  )}
+</Paper>
       )}
     </Box>
   );
