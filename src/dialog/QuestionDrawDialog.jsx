@@ -58,6 +58,10 @@ export default function QuestionDrawDialog({
   const drawingRef = useRef(false);
   const spinAudioRef = useRef(null);
 
+  // Tham chiếu vùng nội dung và phần gợi ý trả lời
+  const answerRef = useRef(null);
+  const contentRef = useRef(null);
+
   // Lưu vị trí câu hỏi đã bốc gần nhất
   const lastDrawnIndexRef = useRef(-1);
 
@@ -68,7 +72,7 @@ export default function QuestionDrawDialog({
   // Môn học
   const [selectedSubject, setSelectedSubject] = useState("Tin học");
 
-  // Chế độ được đọc từ Firestore, không cho chỉnh sửa tại màn hình chơi
+  // Chế độ được đọc từ Firestore
   const [cheDoChonCauHoi, setCheDoChonCauHoi] =
     useState("ngauNhien");
 
@@ -391,17 +395,11 @@ export default function QuestionDrawDialog({
   useEffect(() => {
     if (!open || !classResolved) return;
 
-    let cancelled = false;
-
     const load = async () => {
       await fetchQuestions();
     };
 
     load();
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     open,
     classResolved,
@@ -425,8 +423,7 @@ export default function QuestionDrawDialog({
 
     setOpenQuestionForm(false);
 
-    // Sau khi lưu ở QuestionFormDialog,
-    // tải lại document để lấy cấu hình mới nhất từ Firestore.
+    // Tải lại document để lấy cấu hình mới nhất từ Firestore
     await fetchQuestions();
   };
 
@@ -458,12 +455,9 @@ export default function QuestionDrawDialog({
     let finalIndex = 0;
 
     if (cheDoChonCauHoi === "theoThuTu") {
-      // Lần đầu: câu 1 (index 0)
-      // Những lần tiếp theo: câu kế tiếp
       finalIndex =
         (lastDrawnIndexRef.current + 1) % totalQuestions;
     } else {
-      // Ngẫu nhiên
       finalIndex = Math.floor(
         Math.random() * totalQuestions
       );
@@ -476,14 +470,12 @@ export default function QuestionDrawDialog({
       let currentIndex;
 
       if (cheDoChonCauHoi === "theoThuTu") {
-        // Hiệu ứng chạy tuần tự
         const startIndex =
           lastDrawnIndexRef.current + 1;
 
         currentIndex =
           (startIndex + count) % totalQuestions;
       } else {
-        // Hiệu ứng chạy ngẫu nhiên
         currentIndex = Math.floor(
           Math.random() * totalQuestions
         );
@@ -524,7 +516,19 @@ export default function QuestionDrawDialog({
   const toggleAnswer = () => {
     if (!selectedAnswer || drawingRef.current) return;
 
-    setShowAnswer((prev) => !prev);
+    const nextShow = !showAnswer;
+
+    setShowAnswer(nextShow);
+
+    if (nextShow) {
+      // Chờ Collapse mở xong rồi cuộn đến phần gợi ý
+      setTimeout(() => {
+        answerRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      }, 450);
+    }
   };
 
   // =====================================================
@@ -809,17 +813,21 @@ export default function QuestionDrawDialog({
 
         {/* NỘI DUNG CHÍNH */}
         <DialogContent
+          ref={contentRef}
           sx={{
-            px: { xs: 1.5, sm: 3 },
-            py: { xs: 1, sm: 1.5 },
+            px: { xs: 1, sm: 3 },
+            py: { xs: 0.8, sm: 1.5 },
             background:
               "linear-gradient(180deg,#f8fbff 0%,#ffffff 100%)",
             display: "flex",
             flexDirection: "column",
-            gap: { xs: 1, sm: 1.5 },
+            gap: { xs: 0.8, sm: 1.5 },
             flex: "1 1 0",
             minHeight: 0,
             overflowY: "auto",
+            overflowX: "hidden",
+            WebkitOverflowScrolling: "touch",
+            overscrollBehavior: "contain",
           }}
         >
           {/* CHỌN MÔN HỌC + SỐ CÂU HỎI */}
@@ -939,7 +947,7 @@ export default function QuestionDrawDialog({
               position: "relative",
               overflow: "hidden",
               mt: 2,
-              minHeight: 250,
+              minHeight: { xs: 180, sm: 250 },
               boxSizing: "border-box",
               borderRadius: 4,
               border: drawing
@@ -956,8 +964,8 @@ export default function QuestionDrawDialog({
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              px: 2.5,
-              py: 3,
+              px: { xs: 1.2, sm: 2.5 },
+              py: { xs: 1.5, sm: 3 },
               textAlign: "center",
               transition: "background .5s ease, border .5s ease",
               boxShadow: drawing
@@ -1177,7 +1185,7 @@ export default function QuestionDrawDialog({
                   <Paper
                     elevation={0}
                     sx={{
-                      p: { xs: 2, sm: 2.5 },
+                      p: { xs: 1.3, sm: 2.5 },
                       borderRadius: 3,
                       background: "rgba(255,255,255,.88)",
                       border: "1px solid #bfdbfe",
@@ -1266,10 +1274,11 @@ export default function QuestionDrawDialog({
                     unmountOnExit
                   >
                     <Paper
+                      ref={answerRef}
                       elevation={0}
                       sx={{
-                        mt: 1.5,
-                        p: { xs: 2, sm: 2.5 },
+                        mt: 1,
+                        p: { xs: 1.3, sm: 2.5 },
                         borderRadius: 3,
                         textAlign: "left",
                         background:
@@ -1277,6 +1286,7 @@ export default function QuestionDrawDialog({
                         border: "1px solid #a7f3d0",
                         boxShadow:
                           "0 6px 18px rgba(16,185,129,.08)",
+                        scrollMarginBottom: 16,
                       }}
                     >
                       <Stack
