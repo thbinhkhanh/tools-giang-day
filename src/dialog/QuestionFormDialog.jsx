@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 
 import {
@@ -25,6 +26,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import QuizRoundedIcon from "@mui/icons-material/QuizRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import ShuffleRoundedIcon from "@mui/icons-material/ShuffleRounded";
+import FormatListNumberedRoundedIcon from "@mui/icons-material/FormatListNumberedRounded";
 
 import {
   doc,
@@ -35,9 +40,6 @@ import {
 
 import { db } from "../firebase";
 
-// =========================
-// DANH SÁCH MÔN HỌC TIỂU HỌC
-// =========================
 const SUBJECTS = [
   "Tiếng Việt",
   "Toán",
@@ -54,19 +56,30 @@ const SUBJECTS = [
   "Hoạt động trải nghiệm",
 ];
 
-// =========================
-// LẤY TUẦN ĐANG ĐƯỢC CHỌN
-// =========================
-const getSelectedWeek = () => {
-  try {
-    const value = localStorage.getItem("tools_tuan");
-    const week = Number(value);
+const createEmptyRow = () => ({
+  question: "",
+  answer: "",
+});
 
-    return week >= 1 && week <= 35 ? String(week) : "";
-  } catch (error) {
-    console.error("Lỗi đọc tuần đang chọn:", error);
-    return "";
+const normalizeWeek = (value) => {
+  const week = Number(value);
+
+  return Number.isInteger(week) && week >= 1 && week <= 35
+    ? String(week)
+    : "";
+};
+
+const getGrade = (value) => {
+  const match = String(value || "").trim().match(/^(\d+)/);
+  return match ? match[1] : "";
+};
+
+const normalizeSubject = (value) => {
+  if (Array.isArray(value)) {
+    return String(value[0] || "").trim();
   }
+
+  return String(value || "").trim();
 };
 
 export default function QuestionFormDialog({
@@ -79,16 +92,23 @@ export default function QuestionFormDialog({
   const [questionInfo, setQuestionInfo] = useState({
     grade: "",
     subject: "",
-    week: getSelectedWeek(),
+    week: "",
     lesson: "",
-    content: "",
   });
 
+  const [gradeList, setGradeList] = useState([]);
+
+  const [questionRows, setQuestionRows] = useState([
+    createEmptyRow(),
+  ]);
+
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const [loadingGrades, setLoadingGrades] = useState(false);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [gradeList, setGradeList] = useState([]);
-  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [drawMode, setDrawMode] = useState("sequential");
 
   const [notification, setNotification] = useState({
     open: false,
@@ -96,101 +116,6 @@ export default function QuestionFormDialog({
     severity: "success",
   });
 
-  // =========================
-  // LẤY TÀI KHOẢN ĐANG ĐĂNG NHẬP
-  // =========================
-  const getCurrentUsername = () => {
-    try {
-      const currentUser = JSON.parse(
-        localStorage.getItem("tools_user") || "null"
-      );
-
-      return String(currentUser?.username || "").trim();
-    } catch (error) {
-      console.error("Lỗi đọc tài khoản đăng nhập:", error);
-      return "";
-    }
-  };
-
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
-
-    const fetchGrades = async () => {
-      setLoadingGrades(true);
-
-      try {
-        const username = getCurrentUsername();
-
-        if (!username) {
-          throw new Error("Không xác định được tài khoản đăng nhập.");
-        }
-
-        const userRef = doc(db, "USERS", username);
-        const userSnap = await getDoc(userRef);
-
-        if (!userSnap.exists()) {
-          throw new Error("Không tìm thấy thông tin tài khoản.");
-        }
-
-        const lopDay = userSnap.data()?.lopDay;
-
-        // Hỗ trợ lopDay là chuỗi hoặc mảng
-        const classValues = Array.isArray(lopDay)
-          ? lopDay
-          : String(lopDay || "").split(",");
-
-        // Ví dụ: ["4.3", "2.1", "5.6"] => ["2", "4", "5"]
-        const grades = [
-          ...new Set(
-            classValues
-              .map((item) => {
-                const match = String(item).trim().match(/^(\d+)\s*\./);
-                return match ? match[1] : "";
-              })
-              .filter(Boolean)
-          ),
-        ].sort((a, b) => Number(a) - Number(b));
-
-        if (!cancelled) {
-          setGradeList(grades);
-
-          // Nếu khối đang chọn không còn trong danh sách được phân công
-          setQuestionInfo((prev) => ({
-            ...prev,
-            grade: grades.includes(prev.grade) ? prev.grade : "",
-            content: grades.includes(prev.grade) ? prev.content : "",
-            lesson: grades.includes(prev.grade) ? prev.lesson : "",
-          }));
-        }
-      } catch (error) {
-        console.error("Lỗi tải danh sách lớp được phân công:", error);
-
-        if (!cancelled) {
-          setGradeList([]);
-          showNotification(
-            error.message || "Không thể tải danh sách lớp được phân công.",
-            "error"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingGrades(false);
-        }
-      }
-    };
-
-    fetchGrades();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  // =========================
-  // THÔNG BÁO
-  // =========================
   const showNotification = (message, severity = "success") => {
     setNotification({
       open: true,
@@ -199,21 +124,25 @@ export default function QuestionFormDialog({
     });
   };
 
-  // =========================
-  // TẠO ID TÀI LIỆU
-  // MỖI MÔN ĐƯỢC LƯU TRONG
-  // MỘT NHÓM RIÊNG
-  // =========================
+  const getCurrentUsername = () => {
+    try {
+      const currentUser = JSON.parse(
+        localStorage.getItem("tools_user") || "null"
+      );
+
+      return String(currentUser?.username || "")
+        .trim()
+        .toLowerCase();
+    } catch (error) {
+      console.error("Lỗi đọc tài khoản:", error);
+      return "";
+    }
+  };
+
   const getQuestionDocumentId = (grade, week) => {
     return `quiz_Lớp ${grade}_${week}`;
   };
 
-  // =========================
-  // ĐƯỜNG DẪN FIRESTORE
-  // USERS/{username}
-  //   /CAUHOI_NGAUNHIEN/{subject}
-  //   /DANHSACH/{documentId}
-  // =========================
   const getQuestionDocumentRef = (
     username,
     subject,
@@ -230,50 +159,170 @@ export default function QuestionFormDialog({
     );
   };
 
-  // =========================
-  // CẬP NHẬT THÔNG TIN
-  // =========================
   const handleQuestionInfoChange = (field, value) => {
     setQuestionInfo((prev) => ({
       ...prev,
       [field]: value,
-
-      ...(field === "grade" ||
-      field === "subject" ||
-      field === "week"
-        ? {
-            content: "",
-          }
-        : {}),
     }));
   };
 
-  // =========================
-  // KHI MỞ HỘP THOẠI
-  // CẬP NHẬT TUẦN ĐANG CHỌN
-  // =========================
+  const handleRowChange = (index, field, value) => {
+    setQuestionRows((prev) =>
+      prev.map((row, i) =>
+        i === index
+          ? {
+              ...row,
+              [field]: value,
+            }
+          : row
+      )
+    );
+  };
+
+  // THÊM CÂU HỎI
+  const handleAddRow = () => {
+    setQuestionRows((prev) => {
+      const nextRows = [...prev, createEmptyRow()];
+
+      setSelectedIndex(nextRows.length - 1);
+
+      return nextRows;
+    });
+  };
+
+  // XÓA CÂU HỎI
+  const handleRemoveRow = (index) => {
+    setQuestionRows((prev) => {
+      if (prev.length <= 1) {
+        setSelectedIndex(0);
+        return [createEmptyRow()];
+      }
+
+      const nextRows = prev.filter((_, i) => i !== index);
+
+      if (index < selectedIndex) {
+        setSelectedIndex((current) => current - 1);
+      } else if (index === selectedIndex) {
+        setSelectedIndex(
+          Math.min(index, nextRows.length - 1)
+        );
+      }
+
+      return nextRows;
+    });
+  };
+
+  // TẢI THÔNG TIN TÀI KHOẢN
   useEffect(() => {
     if (!open) return;
 
-    const selectedWeek = getSelectedWeek();
+    let cancelled = false;
 
-    setQuestionInfo((prev) => ({
-      ...prev,
-      week: selectedWeek || prev.week,
-    }));
+    const fetchUserInfo = async () => {
+      setLoadingGrades(true);
+
+      try {
+        const username = getCurrentUsername();
+
+        if (!username) {
+          throw new Error(
+            "Không xác định được tài khoản đăng nhập."
+          );
+        }
+
+        const userRef = doc(db, "USERS", username);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          throw new Error(
+            "Không tìm thấy thông tin tài khoản."
+          );
+        }
+
+        const userData = userSnap.data();
+
+        const classValues = Array.isArray(userData.lopDay)
+          ? userData.lopDay
+          : String(userData.lopDay || "").split(",");
+
+        const grades = [
+          ...new Set(
+            classValues
+              .map((item) => getGrade(item))
+              .filter(Boolean)
+          ),
+        ].sort((a, b) => Number(a) - Number(b));
+
+        const selectedGrade = getGrade(
+          userData.lopDangChon
+        );
+
+        const selectedSubject = normalizeSubject(
+          userData.monHoc
+        );
+
+        const selectedWeek = normalizeWeek(userData.tuan);
+
+        if (cancelled) return;
+
+        if (
+          selectedGrade &&
+          !grades.includes(selectedGrade)
+        ) {
+          grades.push(selectedGrade);
+          grades.sort((a, b) => Number(a) - Number(b));
+        }
+
+        setGradeList(grades);
+
+        setQuestionInfo({
+          grade: selectedGrade || grades[0] || "",
+          subject: selectedSubject || "Tin học",
+          week: selectedWeek,
+          lesson: "",
+        });
+
+        setQuestionRows([createEmptyRow()]);
+        setSelectedIndex(0);
+        setDrawMode("sequential");
+
+      } catch (error) {
+        console.error("Lỗi tải thông tin tài khoản:", error);
+
+        if (!cancelled) {
+          showNotification(
+            error.message ||
+              "Không thể tải thông tin tài khoản.",
+            "error"
+          );
+
+          setGradeList([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingGrades(false);
+        }
+      }
+    };
+
+    fetchUserInfo();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
-  // =========================
-  // TỰ ĐỘNG TẢI CÂU HỎI
-  // KHI CHỌN LỚP + MÔN + TUẦN
-  // =========================
+  // TẢI CÂU HỎI TỪ FIRESTORE
   useEffect(() => {
-    if (!open) return;
+    if (!open || loadingGrades) return;
 
     const { grade, subject, week } = questionInfo;
 
     if (!grade || !subject || !week) {
       setLoadingQuestions(false);
+      setQuestionRows([createEmptyRow()]);
+      setSelectedIndex(0);
+      setDrawMode("sequential");
       return;
     }
 
@@ -314,24 +363,53 @@ export default function QuestionFormDialog({
         if (snapshot.exists()) {
           const data = snapshot.data();
 
+          setDrawMode(
+            data.cheDoChonCauHoi === "random"
+              ? "random"
+              : "sequential"
+          );
+
           const questions = Array.isArray(data.cauHoi)
             ? data.cauHoi
-                .filter((item) => typeof item === "string")
-                .map((item) => item.trim())
-                .filter(Boolean)
             : [];
+
+          const answers = Array.isArray(data.dapAn)
+            ? data.dapAn
+            : [];
+
+          const rows = questions
+            .map((question, index) => ({
+              question: String(question || ""),
+              answer: String(answers[index] || ""),
+            }))
+            .filter(
+              (row) =>
+                row.question.trim() || row.answer.trim()
+            );
+
+          setQuestionRows(
+            rows.length ? rows : [createEmptyRow()]
+          );
+
+          setSelectedIndex(0);
 
           setQuestionInfo((prev) => ({
             ...prev,
-            content: questions.join("\n"),
             lesson: data.tenBai || "",
           }));
 
-          console.log("Đã tải câu hỏi:", questions.length);
+          console.log("Đã tải câu hỏi:", rows.length);
+          console.log(
+            "Chế độ chọn câu hỏi:",
+            data.cheDoChonCauHoi || "sequential"
+          );
         } else {
+          setQuestionRows([createEmptyRow()]);
+          setSelectedIndex(0);
+          setDrawMode("sequential");
+
           setQuestionInfo((prev) => ({
             ...prev,
-            content: "",
             lesson: "",
           }));
 
@@ -344,14 +422,13 @@ export default function QuestionFormDialog({
         console.error("Lỗi tải câu hỏi:", error);
 
         if (!cancelled) {
-          setQuestionInfo((prev) => ({
-            ...prev,
-            content: "",
-          }));
+          setQuestionRows([createEmptyRow()]);
+          setSelectedIndex(0);
+          setDrawMode("sequential");
 
           showNotification(
             error.message ||
-              "Không thể tải danh sách câu hỏi từ Firestore.",
+              "Không thể tải danh sách câu hỏi.",
             "error"
           );
         }
@@ -369,28 +446,22 @@ export default function QuestionFormDialog({
     };
   }, [
     open,
+    loadingGrades,
     questionInfo.grade,
     questionInfo.subject,
     questionInfo.week,
   ]);
 
-  // =========================
-  // ĐẾM CÂU HỎI
-  // =========================
-  const questionCount = questionInfo.content
-    .split("\n")
-    .filter((item) => item.trim()).length;
+  const questionCount = questionRows.filter(
+    (row) => row.question.trim()
+  ).length;
 
-  // =========================
-  // LƯU CÂU HỎI FIRESTORE
-  // =========================
+  const currentRow =
+    questionRows[selectedIndex] || createEmptyRow();
+
+  // LƯU CÂU HỎI
   const handleSave = async () => {
     if (drawing || saving || loadingQuestions) return;
-
-    const list = questionInfo.content
-      .split("\n")
-      .map((item) => item.trim())
-      .filter(Boolean);
 
     if (!questionInfo.grade) {
       showNotification("Vui lòng chọn lớp học.", "warning");
@@ -403,10 +474,7 @@ export default function QuestionFormDialog({
     }
 
     if (!questionInfo.week) {
-      showNotification(
-        "Vui lòng chọn tuần học.",
-        "warning"
-      );
+      showNotification("Vui lòng chọn tuần học.", "warning");
       return;
     }
 
@@ -415,13 +483,49 @@ export default function QuestionFormDialog({
       return;
     }
 
-    if (!list.length) {
+    const rows = questionRows.map((row) => ({
+      question: String(row.question || "").trim(),
+      answer: String(row.answer || "").trim(),
+    }));
+
+    if (!rows.length) {
       showNotification(
-        "Vui lòng nhập danh sách câu hỏi.",
+        "Vui lòng nhập ít nhất một câu hỏi.",
         "warning"
       );
       return;
     }
+
+    const missingQuestion = rows.findIndex(
+      (row) => !row.question
+    );
+
+    if (missingQuestion !== -1) {
+      setSelectedIndex(missingQuestion);
+
+      showNotification(
+        `Vui lòng nhập nội dung Câu hỏi ${missingQuestion + 1}.`,
+        "warning"
+      );
+      return;
+    }
+
+    const missingAnswer = rows.findIndex(
+      (row) => !row.answer
+    );
+
+    if (missingAnswer !== -1) {
+      setSelectedIndex(missingAnswer);
+
+      showNotification(
+        `Vui lòng nhập kiến thức cần ghi nhớ cho Câu hỏi ${missingAnswer + 1}.`,
+        "warning"
+      );
+      return;
+    }
+
+    const questions = rows.map((row) => row.question);
+    const answers = rows.map((row) => row.answer);
 
     setSaving(true);
 
@@ -445,8 +549,13 @@ export default function QuestionFormDialog({
         monHoc: questionInfo.subject,
         tuan: Number(questionInfo.week),
         tenBai: questionInfo.lesson.trim(),
-        cauHoi: list,
-        soLuong: list.length,
+
+        cauHoi: questions,
+        dapAn: answers,
+
+        soLuong: questions.length,
+        cheDoChonCauHoi: drawMode,
+
         namHoc: schoolYear,
         updatedAt: serverTimestamp(),
       };
@@ -458,21 +567,27 @@ export default function QuestionFormDialog({
       );
 
       console.log(
-        "Đường dẫn lưu câu hỏi:",
+        "Đường dẫn lưu:",
         documentRef.path
       );
 
-      console.log("Tài khoản lưu:", username);
-      console.log("Môn học:", questionInfo.subject);
+      console.log("Số câu hỏi:", questions.length);
+      console.log("Chế độ:", drawMode);
 
       await setDoc(documentRef, documentData);
 
       showNotification(
-        "Đã lưu câu hỏi thành công.",
+        "Đã lưu câu hỏi và cấu hình thành công.",
         "success"
       );
 
-      onSave?.(list, questionInfo);
+      onSave?.(
+        questions,
+        questionInfo,
+        answers,
+        drawMode
+      );
+
     } catch (error) {
       console.error("Lỗi lưu câu hỏi:", error);
 
@@ -486,17 +601,20 @@ export default function QuestionFormDialog({
     }
   };
 
-  // =========================
-  // ĐIỀU KIỆN VÔ HIỆU HÓA NÚT LƯU
-  // =========================
   const canSave =
     questionInfo.grade &&
     questionInfo.subject &&
     questionInfo.week &&
     questionInfo.lesson.trim() &&
-    questionInfo.content.trim() &&
+    questionCount > 0 &&
+    questionRows.every(
+      (row) =>
+        row.question.trim() &&
+        row.answer.trim()
+    ) &&
     !drawing &&
     !loadingQuestions &&
+    !loadingGrades &&
     !saving;
 
   return (
@@ -506,15 +624,18 @@ export default function QuestionFormDialog({
         onClose={onClose}
         fullWidth
         maxWidth={false}
+        TransitionComponent={Fade}
         sx={{
           "& .MuiDialog-container": {
             alignItems: "center",
           },
           "& .MuiDialog-paper": {
-            margin: { xs: "8px", sm: "32px" },
+            margin: {
+              xs: "8px",
+              sm: "32px",
+            },
           },
         }}
-        TransitionComponent={Fade}
         PaperProps={{
           sx: {
             width: {
@@ -525,13 +646,19 @@ export default function QuestionFormDialog({
               xs: "calc(100vw - 16px)",
               sm: "900px",
             },
-            height: { xs: "96%", sm: "94dvh" },
-            maxHeight: { xs: "96%", sm: "94dvh" },
-            borderRadius: { xs: 4, sm: 4 },
+            height: {
+              xs: "96%",
+              sm: "94dvh",
+            },
+            maxHeight: {
+              xs: "96%",
+              sm: "94dvh",
+            },
+            borderRadius: 4,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
-            background: "#F8FAFC",
+            bgcolor: "#F8FAFC",
             boxShadow: "0 25px 80px rgba(15,23,42,.25)",
           },
         }}
@@ -558,6 +685,7 @@ export default function QuestionFormDialog({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <EditNoteRoundedIcon sx={{ fontSize: 27 }} />
@@ -572,7 +700,7 @@ export default function QuestionFormDialog({
               fontSize={11}
               color="rgba(219,234,254,.85)"
             >
-              Thông tin bài học và danh sách câu hỏi
+              Câu hỏi tự luận và nội dung củng cố kiến thức
             </Typography>
           </Box>
 
@@ -595,7 +723,7 @@ export default function QuestionFormDialog({
         {/* CONTENT */}
         <DialogContent
           sx={{
-            p: 2.5,
+            p: { xs: 1.5, sm: 2.5 },
             bgcolor: "#f8fbff",
             overflowY: "auto",
           }}
@@ -614,7 +742,7 @@ export default function QuestionFormDialog({
               fontSize={13}
               fontWeight={900}
               color="#172554"
-              mb={2}
+              mb={1.5}
             >
               <QuizRoundedIcon
                 sx={{
@@ -633,15 +761,15 @@ export default function QuestionFormDialog({
               alignItems="center"
               sx={{
                 width: "100%",
-                flexWrap: "nowrap",
+                flexWrap: "wrap",
+                rowGap: 1.2,
               }}
             >
-              {/* LỚP */}
               <FormControl
                 size="small"
                 sx={{
-                  width: 105,
-                  flexShrink: 0,
+                  flex: { xs: "1 1 calc(50% - 8px)", sm: "0 0 105px" },
+                  minWidth: 0,
                 }}
               >
                 <InputLabel>Lớp</InputLabel>
@@ -649,9 +777,17 @@ export default function QuestionFormDialog({
                 <Select
                   value={questionInfo.grade}
                   label="Lớp"
-                  disabled={loadingGrades || gradeList.length === 0}
+                  disabled={
+                    loadingGrades ||
+                    gradeList.length === 0 ||
+                    saving ||
+                    loadingQuestions
+                  }
                   onChange={(e) =>
-                    handleQuestionInfoChange("grade", e.target.value)
+                    handleQuestionInfoChange(
+                      "grade",
+                      e.target.value
+                    )
                   }
                 >
                   {gradeList.map((grade) => (
@@ -662,12 +798,11 @@ export default function QuestionFormDialog({
                 </Select>
               </FormControl>
 
-              {/* MÔN HỌC */}
               <FormControl
                 size="small"
                 sx={{
-                  width: 205,
-                  flexShrink: 0,
+                  flex: { xs: "1 1 calc(50% - 8px)", sm: "0 0 190px" },
+                  minWidth: 0,
                 }}
               >
                 <InputLabel>Môn học</InputLabel>
@@ -675,8 +810,12 @@ export default function QuestionFormDialog({
                 <Select
                   value={questionInfo.subject}
                   label="Môn học"
+                  disabled={saving || loadingQuestions}
                   onChange={(e) =>
-                    handleQuestionInfoChange("subject", e.target.value)
+                    handleQuestionInfoChange(
+                      "subject",
+                      e.target.value
+                    )
                   }
                 >
                   {SUBJECTS.map((subject) => (
@@ -684,15 +823,21 @@ export default function QuestionFormDialog({
                       {subject}
                     </MenuItem>
                   ))}
+
+                  {questionInfo.subject &&
+                    !SUBJECTS.includes(questionInfo.subject) && (
+                      <MenuItem value={questionInfo.subject}>
+                        {questionInfo.subject}
+                      </MenuItem>
+                    )}
                 </Select>
               </FormControl>
 
-              {/* TUẦN */}
               <FormControl
                 size="small"
                 sx={{
-                  width: 110,
-                  flexShrink: 0,
+                  flex: { xs: "1 1 calc(50% - 8px)", sm: "0 0 105px" },
+                  minWidth: 0,
                 }}
               >
                 <InputLabel>Tuần</InputLabel>
@@ -700,33 +845,123 @@ export default function QuestionFormDialog({
                 <Select
                   value={questionInfo.week}
                   label="Tuần"
+                  disabled={saving || loadingQuestions}
                   onChange={(e) =>
-                    handleQuestionInfoChange("week", e.target.value)
+                    handleQuestionInfoChange(
+                      "week",
+                      e.target.value
+                    )
                   }
                 >
-                  {Array.from({ length: 35 }, (_, i) => i + 1).map((week) => (
-                    <MenuItem key={week} value={String(week)}>
-                      Tuần {week}
-                    </MenuItem>
-                  ))}
+                  {Array.from({ length: 35 }, (_, i) => i + 1).map(
+                    (week) => (
+                      <MenuItem
+                        key={week}
+                        value={String(week)}
+                      >
+                        Tuần {week}
+                      </MenuItem>
+                    )
+                  )}
                 </Select>
               </FormControl>
 
-              {/* TÊN BÀI */}
               <TextField
-                fullWidth
                 size="small"
                 label="Tên bài"
                 placeholder="Nhập tên bài học..."
                 value={questionInfo.lesson}
+                disabled={saving || loadingQuestions}
                 onChange={(e) =>
-                  handleQuestionInfoChange("lesson", e.target.value)
+                  handleQuestionInfoChange(
+                    "lesson",
+                    e.target.value
+                  )
                 }
                 sx={{
-                  flex: 1,
+                  flex: { xs: "1 1 100%", sm: "1 1 180px" },
                   minWidth: 0,
                 }}
               />
+            </Stack>
+          </Paper>
+
+          {/* CẤU HÌNH CHỌN CÂU HỎI */}
+          <Paper
+            elevation={0}
+            sx={{
+              mt: 1.5,
+              p: 1.7,
+              borderRadius: 3,
+              border: "1px solid #dbeafe",
+              bgcolor: "#fff",
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              spacing={1.5}
+            >
+              <Box sx={{ flex: 1 }}>
+                <Typography
+                  fontSize={12}
+                  fontWeight={900}
+                  color="#172554"
+                >
+                  CÁCH CHỌN CÂU HỎI
+                </Typography>
+
+                <Typography fontSize={11} color="#64748b">
+                  Thiết lập thứ tự xuất hiện khi bốc thăm
+                </Typography>
+              </Box>
+
+              <FormControl
+                size="small"
+                sx={{
+                  width: { xs: "100%", sm: 240 },
+                }}
+              >
+                <Select
+                  value={drawMode}
+                  disabled={
+                    loadingQuestions ||
+                    saving ||
+                    drawing
+                  }
+                  onChange={(e) =>
+                    setDrawMode(e.target.value)
+                  }
+                >
+                  <MenuItem value="sequential">
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                    >
+                      <FormatListNumberedRoundedIcon
+                        fontSize="small"
+                        sx={{ color: "#2563eb" }}
+                      />
+                      <span>Lần lượt theo thứ tự</span>
+                    </Stack>
+                  </MenuItem>
+
+                  <MenuItem value="random">
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                    >
+                      <ShuffleRoundedIcon
+                        fontSize="small"
+                        sx={{ color: "#7c3aed" }}
+                      />
+                      <span>Chọn ngẫu nhiên</span>
+                    </Stack>
+                  </MenuItem>
+                </Select>
+              </FormControl>
             </Stack>
           </Paper>
 
@@ -734,13 +969,14 @@ export default function QuestionFormDialog({
           <Paper
             elevation={0}
             sx={{
-              mt: 1.8,
-              p: 2,
+              mt: 1.5,
+              p: { xs: 1.5, sm: 2 },
               borderRadius: 3,
               border: "1px solid #dbeafe",
               bgcolor: "#fff",
             }}
           >
+            {/* TIÊU ĐỀ */}
             <Stack
               direction="row"
               alignItems="center"
@@ -767,11 +1003,11 @@ export default function QuestionFormDialog({
             </Stack>
 
             <Typography
-              fontSize={12}
+              fontSize={11}
               color="#64748b"
-              mb={1}
+              mb={1.5}
             >
-              Nhập mỗi câu hỏi trên một dòng riêng biệt.
+              Chọn từng câu để nhập hoặc chỉnh sửa nội dung. Mỗi lần chỉ hiển thị một câu hỏi.
             </Typography>
 
             {/* TRẠNG THÁI TẢI */}
@@ -781,8 +1017,8 @@ export default function QuestionFormDialog({
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  mb: 1,
-                  p: 1,
+                  mb: 1.5,
+                  p: 1.2,
                   borderRadius: 2,
                   bgcolor: "#eff6ff",
                 }}
@@ -799,193 +1035,354 @@ export default function QuestionFormDialog({
               </Box>
             )}
 
-            {/* BẢNG CÂU HỎI */}
+            {/* CHIP CÂU HỎI + NÚT THÊM CÙNG MỘT HÀNG */}
             <Box
-              data-question-table
               sx={{
-                width: "100%",
-                border: "1px solid #cbd5e1",
-                borderRadius: 2,
-                overflow: "hidden",
-                bgcolor: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+                mb: 1.8,
+                flexWrap: "wrap",
               }}
             >
-              {/* TIÊU ĐỀ CỘT */}
+              {/* CÁC CHIP CHỌN CÂU */}
               <Box
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: "55px minmax(0, 1fr)",
-                  bgcolor: "#e8f0fe",
-                  borderBottom: "1px solid #cbd5e1",
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 0.8,
+                  flex: "1 1 auto",
+                  minWidth: 0,
                 }}
               >
-                <Box
-                  sx={{
-                    py: 1,
-                    textAlign: "center",
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: "#334155",
-                    borderRight: "1px solid #cbd5e1",
-                  }}
-                >
-                  STT
-                </Box>
-
-                <Box
-                  sx={{
-                    py: 1,
-                    px: 1.5,
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: "#334155",
-                  }}
-                >
-                  NỘI DUNG
-                </Box>
+                {questionRows.map((row, index) => (
+                  <Chip
+                    key={index}
+                    clickable
+                    label={`Câu ${index + 1}`}
+                    onClick={() => setSelectedIndex(index)}
+                    color={
+                      selectedIndex === index
+                        ? "primary"
+                        : "default"
+                    }
+                    variant={
+                      selectedIndex === index
+                        ? "filled"
+                        : "outlined"
+                    }
+                    sx={{
+                      height: 34,
+                      borderRadius: 2,
+                      fontWeight: 800,
+                      fontSize: 12,
+                      bgcolor:
+                        selectedIndex === index
+                          ? "#2563eb"
+                          : "#fff",
+                      color:
+                        selectedIndex === index
+                          ? "#fff"
+                          : "#475569",
+                      borderColor:
+                        selectedIndex === index
+                          ? "#2563eb"
+                          : "#cbd5e1",
+                      "&:hover": {
+                        bgcolor:
+                          selectedIndex === index
+                            ? "#1d4ed8"
+                            : "#eff6ff",
+                      },
+                    }}
+                  />
+                ))}
               </Box>
 
-              {/* CÁC DÒNG CÂU HỎI */}
-              {questionInfo.content
-                .split("\n")
-                .map((line, index, lines) => (
+              {/* NÚT THÊM CÂU HỎI - CĂN PHẢI */}
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddRoundedIcon />}
+                onClick={handleAddRow}
+                disabled={
+                  loadingQuestions ||
+                  saving ||
+                  drawing
+                }
+                sx={{
+                  flexShrink: 0,
+                  ml: "auto",
+                  minWidth: "auto",
+                  px: 1.5,
+                  height: 34,
+                  borderRadius: 2,
+                  borderStyle: "dashed",
+                  borderWidth: 1.5,
+                  borderColor: "#93c5fd",
+                  color: "#2563eb",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  textTransform: "none",
+                  whiteSpace: "nowrap",
+                  bgcolor: "#f8fbff",
+                  "&:hover": {
+                    borderWidth: 1.5,
+                    borderStyle: "dashed",
+                    borderColor: "#2563eb",
+                    bgcolor: "#eff6ff",
+                  },
+                }}
+              >
+                THÊM CÂU HỎI
+              </Button>
+            </Box>
+
+            {/* CHỈ HIỂN THỊ CÂU ĐANG CHỌN */}
+            {!loadingQuestions && (
+              <Paper
+                elevation={0}
+                sx={{
+                  position: "relative",
+                  p: { xs: 1.3, sm: 1.8 },
+                  borderRadius: 3,
+                  border: "1px solid #dbeafe",
+                  bgcolor: "#fff",
+                  overflow: "hidden",
+                  "&::before": {
+                    content: '""',
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4,
+                    bgcolor: "#2563eb",
+                  },
+                }}
+              >
+                {/* TIÊU ĐỀ CÂU */}
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  mb={1.5}
+                >
                   <Box
-                    key={index}
                     sx={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "55px minmax(0, 1fr)",
-                      minHeight: 46,
-                      borderBottom:
-                        index < lines.length - 1
-                          ? "1px solid #e2e8f0"
-                          : "none",
-                      bgcolor:
-                        index % 2 === 0
-                          ? "#fff"
-                          : "#f8fafc",
-                      "&:focus-within": {
-                        bgcolor: "#eff6ff",
+                      width: 34,
+                      height: 34,
+                      borderRadius: 2,
+                      bgcolor: "#dbeafe",
+                      color: "#1d4ed8",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 14,
+                      fontWeight: 900,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {selectedIndex + 1}
+                  </Box>
+
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography
+                      fontSize={12}
+                      fontWeight={900}
+                      color="#1e3a8a"
+                    >
+                      CÂU HỎI {selectedIndex + 1}
+                    </Typography>
+
+                    <Typography
+                      fontSize={10}
+                      color="#94a3b8"
+                    >
+                      Câu hỏi tự luận
+                    </Typography>
+                  </Box>
+
+                  <IconButton
+                    size="small"
+                    disabled={
+                      questionRows.length <= 1 ||
+                      saving ||
+                      drawing
+                    }
+                    onClick={() =>
+                      handleRemoveRow(selectedIndex)
+                    }
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      color: "#ef4444",
+                      bgcolor: "#fef2f2",
+                      "&:hover": {
+                        bgcolor: "#fee2e2",
                       },
                     }}
                   >
-                    {/* SỐ THỨ TỰ */}
+                    <DeleteOutlineRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+
+                {/* NỘI DUNG CÂU HỎI */}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2.5,
+                    bgcolor: "#eff6ff",
+                    border: "1px solid #dbeafe",
+                    mb: 1.3,
+                  }}
+                >
+                  <Typography
+                    fontSize={11}
+                    fontWeight={900}
+                    color="#1d4ed8"
+                    mb={1}
+                  >
+                    NỘI DUNG CÂU HỎI
+                  </Typography>
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    maxRows={10}
+                    placeholder="Nhập nội dung câu hỏi tự luận..."
+                    value={currentRow.question}
+                    disabled={
+                      loadingQuestions ||
+                      saving ||
+                      drawing
+                    }
+                    onChange={(e) =>
+                      handleRowChange(
+                        selectedIndex,
+                        "question",
+                        e.target.value
+                      )
+                    }
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "#fff",
+                        borderRadius: 2,
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                        alignItems: "flex-start",
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#bfdbfe",
+                      },
+                      "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#60a5fa",
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* KIẾN THỨC CẦN GHI NHỚ */}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2.5,
+                    bgcolor: "#ecfdf5",
+                    border: "1px solid #bbf7d0",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.8}
+                    mb={1}
+                  >
                     <Box
                       sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 2,
+                        bgcolor: "#d1fae5",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        borderRight: "1px solid #e2e8f0",
-                        color: "#64748b",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        userSelect: "none",
+                        flexShrink: 0,
                       }}
                     >
-                      {index + 1}
+                      <QuizRoundedIcon
+                        sx={{
+                          fontSize: 17,
+                          color: "#059669",
+                        }}
+                      />
                     </Box>
 
-                    {/* NỘI DUNG CÂU HỎI */}
-                    <Box
-                      component="textarea"
-                      value={line}
-                      disabled={loadingQuestions || saving}
-                      onChange={(e) => {
-                        e.target.style.height = "auto";
-                        e.target.style.height = `${e.target.scrollHeight}px`;
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        fontSize={11}
+                        fontWeight={900}
+                        color="#047857"
+                      >
+                        KIẾN THỨC CẦN GHI NHỚ
+                      </Typography>
 
-                        const updatedLines = lines.slice();
-                        updatedLines[index] = e.target.value;
+                      <Typography
+                        fontSize={10}
+                        color="#64748b"
+                      >
+                        Nội dung giải thích và củng cố kiến thức
+                      </Typography>
+                    </Box>
+                  </Stack>
 
-                        handleQuestionInfoChange(
-                          "content",
-                          updatedLines.join("\n")
-                        );
-                      }}
-                      onKeyDown={(e) => {
-                        if (
-                          e.key === "Enter" &&
-                          !e.shiftKey
-                        ) {
-                          e.preventDefault();
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    maxRows={12}
+                    placeholder="Nhập nội dung trả lời, lời giải thích, kiến thức trọng tâm hoặc ví dụ minh họa..."
+                    value={currentRow.answer}
+                    disabled={
+                      loadingQuestions ||
+                      saving ||
+                      drawing
+                    }
+                    onChange={(e) =>
+                      handleRowChange(
+                        selectedIndex,
+                        "answer",
+                        e.target.value
+                      )
+                    }
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "#fff",
+                        borderRadius: 2,
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                        alignItems: "flex-start",
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#a7f3d0",
+                      },
+                      "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#34d399",
+                      },
+                    }}
+                  />
 
-                          const updatedLines = lines.slice();
-                          updatedLines.splice(index + 1, 0, "");
-
-                          handleQuestionInfoChange(
-                            "content",
-                            updatedLines.join("\n")
-                          );
-
-                          const table = e.currentTarget.closest(
-                            "[data-question-table]"
-                          );
-
-                          requestAnimationFrame(() => {
-                            const inputs =
-                              table?.querySelectorAll("textarea");
-
-                            inputs?.[index + 1]?.focus();
-                          });
-                        }
-
-                        if (
-                          e.key === "Backspace" &&
-                          line === "" &&
-                          lines.length > 1
-                        ) {
-                          e.preventDefault();
-
-                          const updatedLines = lines.slice();
-                          updatedLines.splice(index, 1);
-
-                          handleQuestionInfoChange(
-                            "content",
-                            updatedLines.join("\n")
-                          );
-
-                          const table = e.currentTarget.closest(
-                            "[data-question-table]"
-                          );
-
-                          requestAnimationFrame(() => {
-                            const inputs =
-                              table?.querySelectorAll("textarea");
-
-                            inputs?.[
-                              Math.max(0, index - 1)
-                            ]?.focus();
-                          });
-                        }
-                      }}
-                      ref={(el) => {
-                        if (el) {
-                          el.style.height = "auto";
-                          el.style.height = `${el.scrollHeight}px`;
-                        }
-                      }}
-                      rows={1}
-                      style={{
-                        width: "100%",
-                        minHeight: 58,
-                        padding: "10px 12px",
-                        border: "none",
-                        outline: "none",
-                        resize: "none",
-                        overflow: "hidden",
-                        background: "transparent",
-                        fontFamily: "inherit",
-                        fontSize: 16,
-                        lineHeight: 1.6,
-                        boxSizing: "border-box",
-                        whiteSpace: "pre-wrap",
-                        overflowWrap: "break-word",
-                        display: "block",
-                      }}
-                    />
-                  </Box>
-                ))}
-            </Box>
+                  <Typography
+                    fontSize={10}
+                    color="#059669"
+                    sx={{ mt: 0.8 }}
+                  >
+                    Nội dung này giúp học sinh hiểu bài và ghi nhớ kiến thức, không phải đáp án trắc nghiệm.
+                  </Typography>
+                </Box>
+              </Paper>
+            )}
           </Paper>
 
           {/* NÚT LƯU */}
@@ -1011,11 +1408,18 @@ export default function QuestionFormDialog({
               disabled={!canSave}
               sx={{
                 mt: 2,
-                width: { xs: "100%", sm: "25%" },
+                width: {
+                  xs: "100%",
+                  sm: "25%",
+                },
+                minWidth: {
+                  sm: 180,
+                },
                 py: 1.35,
                 borderRadius: 2.5,
                 fontWeight: 900,
                 fontSize: 13,
+                textTransform: "none",
                 background:
                   "linear-gradient(90deg,#2563eb,#0284c7)",
                 boxShadow:

@@ -17,6 +17,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Collapse,
 } from "@mui/material";
 
 import { doc, getDoc } from "firebase/firestore";
@@ -28,6 +29,8 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import ShuffleIcon from "@mui/icons-material/Shuffle";
 import ReplayIcon from "@mui/icons-material/Replay";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
+import LightbulbIcon from "@mui/icons-material/Lightbulb";
 
 import QuestionFormDialog from "./QuestionFormDialog";
 
@@ -38,24 +41,92 @@ export default function QuestionDrawDialog({
   week,
 }) {
   const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState([]);
+
   const [selectedQuestion, setSelectedQuestion] = useState("");
+  const [selectedAnswer, setSelectedAnswer] = useState("");
+
+  const [showAnswer, setShowAnswer] = useState(false);
   const [drawing, setDrawing] = useState(false);
 
-  // Trạng thái tải câu hỏi từ Firestore
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [loadError, setLoadError] = useState("");
 
-  // Dialog soạn câu hỏi
   const [openQuestionForm, setOpenQuestionForm] = useState(false);
 
   const timeoutRef = useRef(null);
   const drawingRef = useRef(false);
+  const spinAudioRef = useRef(null);
+
+  // Lưu vị trí câu hỏi đã bốc gần nhất
+  const lastDrawnIndexRef = useRef(-1);
 
   // Lớp đang chọn theo tài khoản Firestore
   const [selectedClass, setSelectedClass] = useState("");
   const [classResolved, setClassResolved] = useState(false);
 
-  // Đọc lớp đang chọn từ USERS/{username}
+  // Môn học
+  const [selectedSubject, setSelectedSubject] = useState("Tin học");
+
+  // Chế độ được đọc từ Firestore, không cho chỉnh sửa tại màn hình chơi
+  const [cheDoChonCauHoi, setCheDoChonCauHoi] =
+    useState("ngauNhien");
+
+  // =====================================================
+  // CHUẨN HÓA CHẾ ĐỘ CHỌN CÂU HỎI
+  // =====================================================
+
+  const normalizeCheDoChonCauHoi = (value) => {
+    const mode = String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFC");
+
+    if (
+      [
+        "theothutu",
+        "theo_thu_tu",
+        "theo thứ tự",
+        "theo thu tu",
+        "sequential",
+        "order",
+      ].includes(mode)
+    ) {
+      return "theoThuTu";
+    }
+
+    return "ngauNhien";
+  };
+
+  // =====================================================
+  // ÂM THANH VÒNG QUAY
+  // =====================================================
+
+  const playSpinAudio = () => {
+    const audio = spinAudioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 0.75;
+
+    audio.play().catch((error) => {
+      console.warn("Không thể phát âm thanh vòng quay:", error);
+    });
+  };
+
+  const stopSpinAudio = () => {
+    const audio = spinAudioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.currentTime = 0;
+  };
+
+  // =====================================================
+  // ĐỌC LỚP ĐANG CHỌN TỪ USERS/{username}
+  // =====================================================
+
   useEffect(() => {
     if (!open) return;
 
@@ -71,7 +142,9 @@ export default function QuestionDrawDialog({
 
         const username = String(
           currentUser?.username || ""
-        ).trim().toLowerCase();
+        )
+          .trim()
+          .toLowerCase();
 
         if (!username) {
           if (!cancelled) {
@@ -120,16 +193,12 @@ export default function QuestionDrawDialog({
   // XÁC ĐỊNH LỚP VÀ TUẦN
   // =====================================================
 
-  // Ví dụ: 4.4 => 4
   const grade =
     String(selectedClass || "").match(/\d+/)?.[0] || "";
 
-  // Hỗ trợ week = 10 hoặc "Tuần 10"
   const weekNumber =
     String(week ?? "").match(/\d+/)?.[0] || "";
 
-  const [selectedSubject, setSelectedSubject] = useState("Tin học");
-  // Ví dụ: quiz_Lớp 4_Tin học_10
   const documentId =
     grade && weekNumber
       ? `quiz_Lớp ${grade}_${weekNumber}`
@@ -152,7 +221,171 @@ export default function QuestionDrawDialog({
   ];
 
   // =====================================================
-  // TẢI CÂU HỎI TỪ FIRESTORE
+  // HÀM TẢI CÂU HỎI TỪ FIRESTORE
+  // =====================================================
+
+  const fetchQuestions = async () => {
+    setLoadingQuestions(true);
+    setLoadError("");
+
+    setQuestions([]);
+    setAnswers([]);
+
+    setSelectedQuestion("");
+    setSelectedAnswer("");
+    setShowAnswer(false);
+
+    setCheDoChonCauHoi("ngauNhien");
+    lastDrawnIndexRef.current = -1;
+
+    try {
+      if (!grade) {
+        throw new Error(
+          "Vui lòng chọn lớp trước khi bốc thăm."
+        );
+      }
+
+      if (!weekNumber) {
+        throw new Error(
+          "Không tìm thấy tuần học. Vui lòng kiểm tra thông tin tuần."
+        );
+      }
+
+      const currentUser = JSON.parse(
+        localStorage.getItem("tools_user") || "null"
+      );
+
+      const username = String(
+        currentUser?.username || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      if (!username) {
+        throw new Error(
+          "Không xác định được tài khoản đăng nhập."
+        );
+      }
+
+      console.log("Đang tải câu hỏi Firestore:", {
+        username,
+        documentId,
+        selectedClass,
+        week,
+        selectedSubject,
+      });
+
+      const questionRef = doc(
+        db,
+        "USERS",
+        username,
+        "CAUHOI_NGAUNHIEN",
+        selectedSubject,
+        "DANHSACH",
+        documentId
+      );
+
+      const snapshot = await getDoc(questionRef);
+
+      if (!snapshot.exists()) {
+        throw new Error(
+          `Không tìm thấy câu hỏi môn ${selectedSubject} ${grade}, tuần ${weekNumber}.`
+        );
+      }
+
+      const data = snapshot.data();
+
+      console.log("Dữ liệu document:", data);
+
+      // ĐỌC CHẾ ĐỘ TỪ FIRESTORE
+      const mode = normalizeCheDoChonCauHoi(
+        data.cheDoChonCauHoi
+      );
+
+      setCheDoChonCauHoi(mode);
+
+      console.log(
+        "Chế độ chọn câu hỏi lấy từ Firestore:",
+        data.cheDoChonCauHoi,
+        "=>",
+        mode
+      );
+
+      // Ghép câu hỏi và đáp án theo chỉ số gốc
+      const questionList = Array.isArray(data.cauHoi)
+        ? data.cauHoi
+            .map((item, index) => ({
+              question:
+                typeof item === "string"
+                  ? item.trim()
+                  : "",
+              answer: String(
+                data.dapAn?.[index] || ""
+              ).trim(),
+            }))
+            .filter((item) => Boolean(item.question))
+        : [];
+
+      const validQuestions = questionList.map(
+        (item) => item.question
+      );
+
+      const validAnswers = questionList.map(
+        (item) => item.answer
+      );
+
+      setQuestions(validQuestions);
+      setAnswers(validAnswers);
+
+      setSelectedQuestion("");
+      setSelectedAnswer("");
+      setShowAnswer(false);
+
+      // Mỗi lần tải danh sách mới, bắt đầu lại từ câu đầu
+      lastDrawnIndexRef.current = -1;
+
+      if (validQuestions.length === 0) {
+        setLoadError(
+          "Document đã tồn tại nhưng chưa có câu hỏi hợp lệ."
+        );
+      } else {
+        console.log(
+          "Đã tải câu hỏi:",
+          validQuestions.length
+        );
+
+        console.log(
+          "Số câu có kiến thức tham khảo:",
+          validAnswers.filter(Boolean).length
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Lỗi tải câu hỏi từ Firestore:",
+        error
+      );
+
+      setQuestions([]);
+      setAnswers([]);
+
+      setSelectedQuestion("");
+      setSelectedAnswer("");
+      setShowAnswer(false);
+
+      setCheDoChonCauHoi("ngauNhien");
+      lastDrawnIndexRef.current = -1;
+
+      setLoadError(
+        error.message ||
+          "Không thể tải câu hỏi từ Firestore. Vui lòng kiểm tra quyền truy cập."
+      );
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  // =====================================================
+  // TẢI CÂU HỎI KHI MỞ DIALOG / ĐỔI MÔN / ĐỔI LỚP
   // =====================================================
 
   useEffect(() => {
@@ -160,109 +393,11 @@ export default function QuestionDrawDialog({
 
     let cancelled = false;
 
-    const fetchQuestions = async () => {
-      setQuestions([]);
-      setSelectedQuestion("");
-      setLoadError("");
-
-      if (!grade) {
-        setLoadingQuestions(false);
-        setLoadError("Vui lòng chọn lớp trước khi bốc thăm.");
-        return;
-      }
-
-      if (!weekNumber) {
-        setLoadingQuestions(false);
-        setLoadError(
-          "Không tìm thấy tuần học trong CONFIG/config/tuan."
-        );
-        return;
-      }
-
-      setLoadingQuestions(true);
-
-      try {
-        console.log("Đang tải câu hỏi Firestore:", {
-          collection: "CAUHOI_NGAUNHIEN",
-          documentId,
-          selectedClass,
-          week,
-        });
-
-        const currentUser = JSON.parse(
-          localStorage.getItem("tools_user") || "null"
-        );
-
-        const username = String(currentUser?.username || "").trim();
-
-        if (!username) {
-          setLoadError("Không xác định được tài khoản đăng nhập.");
-          return;
-        }
-
-        const questionRef = doc(
-          db,
-          "USERS",
-          username,
-          "CAUHOI_NGAUNHIEN",
-          selectedSubject,
-          "DANHSACH",
-          documentId
-        );
-
-        const snapshot = await getDoc(questionRef);
-
-        if (cancelled) return;
-
-        if (!snapshot.exists()) {
-          setQuestions([]);
-          setLoadError(
-            `Không tìm thấy câu hỏi môn ${selectedSubject} ${grade}, tuần ${weekNumber}.`
-          );
-          return;
-        }
-
-        const data = snapshot.data();
-
-        console.log("Dữ liệu document:", data);
-
-        const questionList = Array.isArray(data.cauHoi)
-          ? data.cauHoi
-              .filter(
-                (item) =>
-                  typeof item === "string" &&
-                  item.trim() !== ""
-              )
-              .map((item) => item.trim())
-          : [];
-
-        setQuestions(questionList);
-
-        if (questionList.length === 0) {
-          setLoadError(
-            "Document đã tồn tại nhưng trường cauHoi chưa có dữ liệu hợp lệ."
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Lỗi tải câu hỏi từ Firestore:",
-          error
-        );
-
-        if (!cancelled) {
-          setQuestions([]);
-          setLoadError(
-            "Không thể tải câu hỏi từ Firestore. Vui lòng kiểm tra quyền truy cập."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingQuestions(false);
-        }
-      }
+    const load = async () => {
+      await fetchQuestions();
     };
 
-    fetchQuestions();
+    load();
 
     return () => {
       cancelled = true;
@@ -281,25 +416,22 @@ export default function QuestionDrawDialog({
   // NHẬN DANH SÁCH CÂU HỎI TỪ DIALOG SOẠN
   // =====================================================
 
-  const handleSaveQuestionList = (list, info) => {
+  const handleSaveQuestionList = async (
+    list,
+    info,
+    answerList = []
+  ) => {
     if (drawingRef.current) return;
-    if (!Array.isArray(list) || !list.length) return;
 
-    const validQuestions = list.filter(
-      (item) =>
-        typeof item === "string" && item.trim() !== ""
-    );
-
-    if (!validQuestions.length) return;
-
-    setQuestions(validQuestions);
-    setSelectedQuestion("");
-    setLoadError("");
     setOpenQuestionForm(false);
+
+    // Sau khi lưu ở QuestionFormDialog,
+    // tải lại document để lấy cấu hình mới nhất từ Firestore.
+    await fetchQuestions();
   };
 
   // =====================================================
-  // BỐC THĂM CÂU HỎI
+  // BỐC THĂM CÂU HỎI THEO CẤU HÌNH FIRESTORE
   // =====================================================
 
   const drawQuestion = () => {
@@ -312,35 +444,87 @@ export default function QuestionDrawDialog({
     }
 
     drawingRef.current = true;
-
     setDrawing(true);
+
+    playSpinAudio();
+
     setSelectedQuestion("");
+    setSelectedAnswer("");
+    setShowAnswer(false);
+
+    const totalQuestions = questions.length;
+
+    // Chọn câu cuối cùng theo cấu hình lấy từ Firestore
+    let finalIndex = 0;
+
+    if (cheDoChonCauHoi === "theoThuTu") {
+      // Lần đầu: câu 1 (index 0)
+      // Những lần tiếp theo: câu kế tiếp
+      finalIndex =
+        (lastDrawnIndexRef.current + 1) % totalQuestions;
+    } else {
+      // Ngẫu nhiên
+      finalIndex = Math.floor(
+        Math.random() * totalQuestions
+      );
+    }
 
     let count = 0;
 
+    // Vòng quay hiển thị hiệu ứng
     timeoutRef.current = setInterval(() => {
-      const randomIndex = Math.floor(
-        Math.random() * questions.length
-      );
+      let currentIndex;
 
-      setSelectedQuestion(questions[randomIndex]);
+      if (cheDoChonCauHoi === "theoThuTu") {
+        // Hiệu ứng chạy tuần tự
+        const startIndex =
+          lastDrawnIndexRef.current + 1;
+
+        currentIndex =
+          (startIndex + count) % totalQuestions;
+      } else {
+        // Hiệu ứng chạy ngẫu nhiên
+        currentIndex = Math.floor(
+          Math.random() * totalQuestions
+        );
+      }
+
+      setSelectedQuestion(questions[currentIndex]);
 
       count++;
 
-      if (count >= 40) {
+      if (count >= 30) {
         clearInterval(timeoutRef.current);
         timeoutRef.current = null;
 
-        const finalIndex = Math.floor(
-          Math.random() * questions.length
+        stopSpinAudio();
+
+        // Lưu vị trí câu vừa bốc
+        lastDrawnIndexRef.current = finalIndex;
+
+        // Hiển thị câu hỏi và đáp án đúng vị trí
+        setSelectedQuestion(questions[finalIndex]);
+
+        setSelectedAnswer(
+          String(answers[finalIndex] || "").trim()
         );
 
-        setSelectedQuestion(questions[finalIndex]);
+        setShowAnswer(false);
 
         drawingRef.current = false;
         setDrawing(false);
       }
     }, 100);
+  };
+
+  // =====================================================
+  // HIỂN THỊ / ẨN KIẾN THỨC THAM KHẢO
+  // =====================================================
+
+  const toggleAnswer = () => {
+    if (!selectedAnswer || drawingRef.current) return;
+
+    setShowAnswer((prev) => !prev);
   };
 
   // =====================================================
@@ -354,8 +538,15 @@ export default function QuestionDrawDialog({
         timeoutRef.current = null;
       }
 
+      stopSpinAudio();
+
       drawingRef.current = false;
+      lastDrawnIndexRef.current = -1;
+
       setSelectedQuestion("");
+      setSelectedAnswer("");
+      setShowAnswer(false);
+
       setDrawing(false);
       setOpenQuestionForm(false);
     }
@@ -372,6 +563,7 @@ export default function QuestionDrawDialog({
         timeoutRef.current = null;
       }
 
+      stopSpinAudio();
       drawingRef.current = false;
     };
   }, []);
@@ -381,10 +573,10 @@ export default function QuestionDrawDialog({
   // =====================================================
 
   const handleClose = (event, reason) => {
-    // Không đóng khi bấm ra ngoài Dialog
     if (reason === "backdropClick") return;
-
     if (drawingRef.current) return;
+
+    stopSpinAudio();
 
     setOpenQuestionForm(false);
     onClose?.();
@@ -395,7 +587,6 @@ export default function QuestionDrawDialog({
       <Dialog
         open={open}
         onClose={(event, reason) => {
-          // Không đóng khi bấm ra ngoài hoặc nhấn ESC
           if (
             reason === "backdropClick" ||
             reason === "escapeKeyDown"
@@ -403,7 +594,7 @@ export default function QuestionDrawDialog({
             return;
           }
 
-          handleClose();
+          handleClose(event, reason);
         }}
         disableEscapeKeyDown
         fullWidth
@@ -424,7 +615,6 @@ export default function QuestionDrawDialog({
             background: "#fff",
             boxShadow: "0 25px 80px rgba(15,23,42,.25)",
             position: "relative",
-
             width: {
               xs: "calc(100vw - 16px)",
               sm: "calc(100% - 64px)",
@@ -433,15 +623,20 @@ export default function QuestionDrawDialog({
               xs: "calc(100vw - 16px)",
               sm: "900px",
             },
-
             height: { xs: "96%", sm: "94%" },
             maxHeight: { xs: "96%", sm: "94%" },
-
             display: "flex",
             flexDirection: "column",
           },
         }}
       >
+        <audio
+          ref={spinAudioRef}
+          src="/sounds/chiec-non-ky-dieu.mp3"
+          preload="auto"
+          loop
+        />
+
         {/* HEADER */}
         <Box
           sx={{
@@ -455,7 +650,6 @@ export default function QuestionDrawDialog({
             flexShrink: 0,
           }}
         >
-          {/* HIỆU ỨNG ÁNH SÁNG */}
           <Box
             sx={{
               position: "absolute",
@@ -484,7 +678,6 @@ export default function QuestionDrawDialog({
             }}
           />
 
-          {/* NÚT ĐÓNG */}
           <IconButton
             onClick={handleClose}
             disabled={drawing}
@@ -516,7 +709,6 @@ export default function QuestionDrawDialog({
               minWidth: 0,
             }}
           >
-            {/* ICON */}
             <Box
               sx={{
                 width: { xs: 36, sm: 44 },
@@ -534,10 +726,11 @@ export default function QuestionDrawDialog({
                 border: "1px solid rgba(255,255,255,.35)",
               }}
             >
-              <AutoAwesomeIcon sx={{ fontSize: { xs: 22, sm: 27 } }} />
+              <AutoAwesomeIcon
+                sx={{ fontSize: { xs: 22, sm: 27 } }}
+              />
             </Box>
 
-            {/* TIÊU ĐỀ */}
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 sx={{
@@ -562,11 +755,11 @@ export default function QuestionDrawDialog({
                   whiteSpace: "nowrap",
                 }}
               >
-                Lớp {grade || "—"} · {selectedSubject} · Tuần {weekNumber || "—"}
+                Lớp {grade || "—"} · {selectedSubject} · Tuần{" "}
+                {weekNumber || "—"}
               </Typography>
             </Box>
 
-            {/* NÚT SOẠN CÂU HỎI */}
             <Button
               size="small"
               disabled={drawing}
@@ -582,6 +775,7 @@ export default function QuestionDrawDialog({
                 fontSize: { xs: 9, sm: 11 },
                 fontWeight: 800,
                 whiteSpace: "nowrap",
+                textTransform: "none",
                 "& .MuiButton-startIcon": {
                   mr: { xs: 0.4, sm: 0.8 },
                   "& svg": {
@@ -620,14 +814,12 @@ export default function QuestionDrawDialog({
             py: { xs: 1, sm: 1.5 },
             background:
               "linear-gradient(180deg,#f8fbff 0%,#ffffff 100%)",
-
             display: "flex",
             flexDirection: "column",
             gap: { xs: 1, sm: 1.5 },
-
             flex: "1 1 0",
             minHeight: 0,
-            overflow: "hidden",
+            overflowY: "auto",
           }}
         >
           {/* CHỌN MÔN HỌC + SỐ CÂU HỎI */}
@@ -640,7 +832,6 @@ export default function QuestionDrawDialog({
               mt: 2,
             }}
           >
-            {/* CHỌN MÔN HỌC */}
             <FormControl
               size="small"
               disabled={drawing || loadingQuestions}
@@ -679,8 +870,12 @@ export default function QuestionDrawDialog({
                 onChange={(e) => {
                   setSelectedSubject(e.target.value);
                   setSelectedQuestion("");
+                  setSelectedAnswer("");
+                  setShowAnswer(false);
                   setQuestions([]);
+                  setAnswers([]);
                   setLoadError("");
+                  lastDrawnIndexRef.current = -1;
                 }}
               >
                 {subjects.map((subject) => (
@@ -691,7 +886,6 @@ export default function QuestionDrawDialog({
               </Select>
             </FormControl>
 
-            {/* SỐ CÂU HỎI */}
             <Paper
               elevation={0}
               sx={{
@@ -723,7 +917,9 @@ export default function QuestionDrawDialog({
               </Typography>
 
               <Chip
-                label={loadingQuestions ? "..." : questions.length}
+                label={
+                  loadingQuestions ? "..." : questions.length
+                }
                 size="small"
                 sx={{
                   height: 24,
@@ -821,7 +1017,7 @@ export default function QuestionDrawDialog({
                 : "BẠN SẼ NHẬN ĐƯỢC CÂU HỎI NÀO?"}
             </Typography>
 
-            {/* HỘP / THẺ CÂU HỎI */}
+            {/* ĐANG TẢI */}
             {loadingQuestions ? (
               <Box
                 sx={{
@@ -838,14 +1034,15 @@ export default function QuestionDrawDialog({
                 <CircularProgress size={42} thickness={4} />
               </Box>
             ) : drawing ? (
-              /* TRẠNG THÁI ĐANG QUAY: THẺ BÍ MẬT */
+              /* ĐANG QUAY */
               <Box
                 sx={{
                   position: "relative",
                   width: 116,
                   height: 116,
                   perspective: 600,
-                  animation: "mysteryFloat 1s ease-in-out infinite",
+                  animation:
+                    "mysteryFloat 1s ease-in-out infinite",
                   "@keyframes mysteryFloat": {
                     "0%, 100%": {
                       transform: "translateY(0) rotate(-4deg)",
@@ -856,21 +1053,20 @@ export default function QuestionDrawDialog({
                   },
                 }}
               >
-                {/* VÒNG SÁNG */}
                 <Box
                   sx={{
                     position: "absolute",
                     inset: -12,
                     borderRadius: 5,
                     border: "2px dashed rgba(191,219,254,.65)",
-                    animation: "mysterySpin 5s linear infinite",
+                    animation:
+                      "mysterySpin 5s linear infinite",
                     "@keyframes mysterySpin": {
                       to: { transform: "rotate(360deg)" },
                     },
                   }}
                 />
 
-                {/* THẺ */}
                 <Box
                   sx={{
                     width: "100%",
@@ -886,7 +1082,8 @@ export default function QuestionDrawDialog({
                     border: "2px solid rgba(255,255,255,.75)",
                     boxShadow:
                       "0 12px 30px rgba(37,99,235,.45), inset 0 1px 8px rgba(255,255,255,.4)",
-                    animation: "cardFlip 0.65s ease-in-out infinite alternate",
+                    animation:
+                      "cardFlip 0.65s ease-in-out infinite alternate",
                     "@keyframes cardFlip": {
                       from: {
                         transform: "rotateY(-18deg) scale(.94)",
@@ -901,7 +1098,8 @@ export default function QuestionDrawDialog({
                     sx={{
                       fontSize: 43,
                       mb: 0.5,
-                      filter: "drop-shadow(0 3px 5px rgba(0,0,0,.2))",
+                      filter:
+                        "drop-shadow(0 3px 5px rgba(0,0,0,.2))",
                     }}
                   />
 
@@ -911,7 +1109,8 @@ export default function QuestionDrawDialog({
                       fontWeight: 1000,
                       lineHeight: 1,
                       color: "#fff",
-                      textShadow: "0 3px 8px rgba(0,0,0,.2)",
+                      textShadow:
+                        "0 3px 8px rgba(0,0,0,.2)",
                     }}
                   >
                     ?
@@ -919,13 +1118,14 @@ export default function QuestionDrawDialog({
                 </Box>
               </Box>
             ) : selectedQuestion ? (
-              /* TRẠNG THÁI ĐÃ CHỌN: MỞ THẺ */
+              /* ĐÃ CHỌN CÂU HỎI */
               <Fade in timeout={700}>
                 <Box
                   sx={{
                     position: "relative",
                     width: "100%",
-                    animation: "questionReveal .65s cubic-bezier(.2,.8,.2,1)",
+                    animation:
+                      "questionReveal .65s cubic-bezier(.2,.8,.2,1)",
                     "@keyframes questionReveal": {
                       "0%": {
                         opacity: 0,
@@ -942,7 +1142,6 @@ export default function QuestionDrawDialog({
                     },
                   }}
                 >
-                  {/* BIỂU TƯỢNG CHÚC MỪNG */}
                   <Box
                     sx={{
                       width: 54,
@@ -956,19 +1155,25 @@ export default function QuestionDrawDialog({
                       color: "#fff",
                       background:
                         "linear-gradient(145deg,#fbbf24,#f97316)",
-                      boxShadow: "0 6px 18px rgba(249,115,22,.3)",
+                      boxShadow:
+                        "0 6px 18px rgba(249,115,22,.3)",
                       animation: "trophyPop .7s ease-out",
                       "@keyframes trophyPop": {
-                        "0%": { transform: "scale(0) rotate(-45deg)" },
-                        "75%": { transform: "scale(1.15) rotate(8deg)" },
-                        "100%": { transform: "scale(1) rotate(0)" },
+                        "0%": {
+                          transform: "scale(0) rotate(-45deg)",
+                        },
+                        "75%": {
+                          transform: "scale(1.15) rotate(8deg)",
+                        },
+                        "100%": {
+                          transform: "scale(1) rotate(0)",
+                        },
                       },
                     }}
                   >
                     <AutoAwesomeIcon sx={{ fontSize: 30 }} />
                   </Box>
 
-                  {/* THẺ KẾT QUẢ */}
                   <Paper
                     elevation={0}
                     sx={{
@@ -976,7 +1181,8 @@ export default function QuestionDrawDialog({
                       borderRadius: 3,
                       background: "rgba(255,255,255,.88)",
                       border: "1px solid #bfdbfe",
-                      boxShadow: "0 8px 25px rgba(37,99,235,.10)",
+                      boxShadow:
+                        "0 8px 25px rgba(37,99,235,.10)",
                     }}
                   >
                     <Typography
@@ -1006,11 +1212,140 @@ export default function QuestionDrawDialog({
                     </Typography>
                   </Paper>
 
-                  
+                  {/* NÚT XEM KIẾN THỨC */}
+                  <Box
+                    sx={{
+                      mt: 1,
+                      display: "flex",
+                      justifyContent: "flex-start",
+                    }}
+                  >
+                    <Button
+                      variant="contained"
+                      disabled={!selectedAnswer || drawing}
+                      onClick={toggleAnswer}
+                      startIcon={<MenuBookRoundedIcon />}
+                      sx={{
+                        px: 1.8,
+                        py: 0.6,
+                        minHeight: 30,
+                        borderRadius: 2,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        textTransform: "none",
+                        color: "#fff",
+                        background: showAnswer
+                          ? "linear-gradient(90deg,#059669,#10b981)"
+                          : "linear-gradient(90deg,#2563eb,#0ea5e9)",
+                        boxShadow: "0 3px 9px rgba(37,99,235,.15)",
+                        "& .MuiButton-startIcon": {
+                          mr: 0.6,
+                          "& svg": {
+                            fontSize: 16,
+                          },
+                        },
+                        "&:hover": {
+                          background: showAnswer
+                            ? "linear-gradient(90deg,#047857,#059669)"
+                            : "linear-gradient(90deg,#1d4ed8,#0284c7)",
+                        },
+                        "&.Mui-disabled": {
+                          color: "#94a3b8",
+                          bgcolor: "#e2e8f0",
+                        },
+                      }}
+                    >
+                      {showAnswer ? "Ẩn gợi ý" : "Gợi ý trả lời"}
+                    </Button>
+                  </Box>
+
+                  {/* KIẾN THỨC THAM KHẢO */}
+                  <Collapse
+                    in={showAnswer}
+                    timeout={400}
+                    unmountOnExit
+                  >
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        mt: 1.5,
+                        p: { xs: 2, sm: 2.5 },
+                        borderRadius: 3,
+                        textAlign: "left",
+                        background:
+                          "linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%)",
+                        border: "1px solid #a7f3d0",
+                        boxShadow:
+                          "0 6px 18px rgba(16,185,129,.08)",
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        mb={1.5}
+                      >
+                        <Box
+                          sx={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            bgcolor: "#d1fae5",
+                            color: "#059669",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <LightbulbIcon />
+                        </Box>
+
+                        <Box>
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: "#047857",
+                              letterSpacing: 0.4,
+                            }}
+                          >
+                            KIẾN THỨC CẦN GHI NHỚ
+                          </Typography>
+                        </Box>
+                      </Stack>
+
+                      <Typography
+                        sx={{
+                          fontSize: { xs: 14, sm: 15 },
+                          lineHeight: 1.85,
+                          color: "#064e3b",
+                          fontWeight: 500,
+                          whiteSpace: "pre-wrap",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {selectedAnswer}
+                      </Typography>
+                    </Paper>
+                  </Collapse>
+
+                  {!selectedAnswer && (
+                    <Typography
+                      sx={{
+                        mt: 1.5,
+                        fontSize: 11,
+                        color: "#64748b",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      Câu hỏi này chưa có nội dung kiến thức tham khảo.
+                    </Typography>
+                  )}
                 </Box>
               </Fade>
             ) : (
-              /* TRẠNG THÁI CHƯA BỐC THĂM */
+              /* CHƯA BỐC THĂM */
               <Box
                 sx={{
                   width: 116,
@@ -1024,17 +1359,30 @@ export default function QuestionDrawDialog({
                   background:
                     "linear-gradient(145deg,#60a5fa 0%,#2563eb 55%,#4338ca 100%)",
                   border: "3px solid #fff",
-                  boxShadow: "0 10px 25px rgba(37,99,235,.25)",
-                  animation: "idleFloat 2.5s ease-in-out infinite",
+                  boxShadow:
+                    "0 10px 25px rgba(37,99,235,.25)",
+                  animation:
+                    "idleFloat 2.5s ease-in-out infinite",
                   "@keyframes idleFloat": {
-                    "0%,100%": { transform: "translateY(0)" },
-                    "50%": { transform: "translateY(-7px)" },
+                    "0%,100%": {
+                      transform: "translateY(0)",
+                    },
+                    "50%": {
+                      transform: "translateY(-7px)",
+                    },
                   },
                 }}
               >
-                <QuizRoundedIcon sx={{ fontSize: 43, mb: 0.5 }} />
+                <QuizRoundedIcon
+                  sx={{ fontSize: 43, mb: 0.5 }}
+                />
+
                 <Typography
-                  sx={{ fontSize: 27, fontWeight: 1000, lineHeight: 1 }}
+                  sx={{
+                    fontSize: 27,
+                    fontWeight: 1000,
+                    lineHeight: 1,
+                  }}
                 >
                   ?
                 </Typography>
@@ -1050,7 +1398,11 @@ export default function QuestionDrawDialog({
                   mt: 2,
                   fontSize: 13,
                   fontWeight: 600,
-                  color: drawing ? "#dbeafe" : loadError ? "#dc2626" : "#64748b",
+                  color: drawing
+                    ? "#dbeafe"
+                    : loadError
+                    ? "#dc2626"
+                    : "#64748b",
                   lineHeight: 1.6,
                 }}
               >
@@ -1066,7 +1418,6 @@ export default function QuestionDrawDialog({
             )}
           </Paper>
 
-
           {/* THÔNG BÁO */}
           <Typography
             sx={{
@@ -1075,19 +1426,23 @@ export default function QuestionDrawDialog({
               mb: 2.5,
               minHeight: 22,
               fontSize: 12,
-              color: selectedQuestion ? "#2563eb" : "#64748b",
+              color: selectedQuestion
+                ? "#2563eb"
+                : "#64748b",
               fontWeight: 600,
             }}
           >
             {loadingQuestions
               ? "Hệ thống đang tải dữ liệu từ Firestore..."
               : drawing
-              ? "Hệ thống đang chọn câu hỏi ngẫu nhiên..."
+              ? "Hệ thống đang chọn câu hỏi..."
               : selectedQuestion
-              ? "Chúc các em trả lời thật tốt!"
+              ? showAnswer
+                ? "Hãy cùng học sinh đọc và ghi nhớ kiến thức!"
+                : "Chúc các em trả lời thật tốt!"
               : loadError
               ? "Chưa thể bắt đầu bốc thăm."
-              : "Mỗi câu hỏi đều có cơ hội được chọn."}
+              : "Nhấn nút bên dưới để bắt đầu bốc thăm câu hỏi."}
           </Typography>
 
           {/* NÚT BỐC THĂM */}
@@ -1114,16 +1469,19 @@ export default function QuestionDrawDialog({
               fontSize: 14,
               fontWeight: 900,
               letterSpacing: 0.6,
+              textTransform: "none",
               color: "#fff",
               background: drawing
                 ? "linear-gradient(90deg,#64748b,#94a3b8)"
                 : "linear-gradient(90deg,#2563eb,#0ea5e9)",
-              boxShadow: "0 7px 18px rgba(37,99,235,.25)",
+              boxShadow:
+                "0 7px 18px rgba(37,99,235,.25)",
               "&:hover": {
                 background:
                   "linear-gradient(90deg,#1d4ed8,#0284c7)",
                 transform: "translateY(-2px)",
-                boxShadow: "0 10px 25px rgba(37,99,235,.3)",
+                boxShadow:
+                  "0 10px 25px rgba(37,99,235,.3)",
               },
               "&.Mui-disabled": {
                 color: "#fff",
@@ -1168,7 +1526,7 @@ export default function QuestionDrawDialog({
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG SOẠN CÂU HỎI RIÊNG */}
+      {/* DIALOG SOẠN CÂU HỎI */}
       <QuestionFormDialog
         open={openQuestionForm}
         onClose={() => setOpenQuestionForm(false)}
