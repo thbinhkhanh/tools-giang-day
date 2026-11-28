@@ -22,15 +22,16 @@ import {
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import SettingsIcon from "@mui/icons-material/Settings";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 
 import TimeLimitDialog from "../dialog/TimeLimitDialog";
 
-import SendIcon from "@mui/icons-material/Send";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import CloseIcon from "@mui/icons-material/Close";
 
 import { StudentContext } from "../context/StudentContext";
 import { useWorksheetContext } from "../context/WorksheetContext";
+import { exportPhieuHocTapPDF } from "../utils/exportPhieuHocTapPDF";
 
 import {
   doc,
@@ -111,6 +112,8 @@ export default function PhieuHocTap() {
   const timerRef = useRef(null);
   const submittingRef = useRef(false);
   const timeLoadedRef = useRef(false);
+
+  const headerBoxRef = useRef(null);
 
   // ----------------------------------------------------
   // DỮ LIỆU CÂU HỎI
@@ -1172,6 +1175,15 @@ useEffect(() => {
     return Number.isFinite(points) && points > 0 ? points : 1;
   };
 
+  const handleExportPDF = async () => {
+    await exportPhieuHocTapPDF({
+      headerElement: headerBoxRef.current,
+      questions,
+      worksheetInfo,
+      selectedWeek,
+    });
+  };
+
   // ======================================================
   // NỘP BÀI
   // DỪNG ĐỒNG HỒ VÀ GIỮ NGUYÊN THỜI GIAN CÒN LẠI
@@ -1357,24 +1369,25 @@ useEffect(() => {
       {/* TIÊU ĐỀ PHIẾU */}
 
       <Paper
-  elevation={0}
-  sx={{
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: "16px",
-    overflow: "visible",
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 5px 15px rgba(0,0,0,0.10)",
-    position: "sticky",
-    top: 0,
-    zIndex: 1100,
-    mb: 2,
-  }}
->
-  {/* HEADER */}
+        elevation={0}
+        sx={{
+          width: "100%",
+          backgroundColor: "#fff",
+          borderRadius: "16px",
+          overflow: "visible",
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 5px 15px rgba(0,0,0,0.10)",
+          position: "sticky",
+          top: 0,
+          zIndex: 1100,
+          mb: 2,
+        }}
+      >
+        {/* HEADER */}
 
-  
-<Box
+        
+      <Box
+  ref={headerBoxRef}
   sx={{
     position: "relative",
     overflow: "hidden",
@@ -1462,366 +1475,393 @@ useEffect(() => {
     },
   }}
 >
-  {/* HOA VĂN GÓC TRÁI */}
+        {/* HOA VĂN GÓC TRÁI */}
 
-  <Box
-    sx={{
-      position: "absolute",
-      zIndex: -1,
-      top: -65,
-      left: -45,
-      width: 190,
-      height: 190,
-      border: "2px solid rgba(255,255,255,0.20)",
-      borderRadius: "50%",
-      boxShadow:
-        "0 0 0 18px rgba(255,255,255,0.07), 0 0 0 38px rgba(255,255,255,0.05)",
-      animation: "headerDecorationFloat 7s ease-in-out infinite",
-    }}
-  />
-
-  {/* HOA VĂN GÓC PHẢI */}
-
-  <Box
-    sx={{
-      position: "absolute",
-      zIndex: -1,
-      top: -35,
-      right: -25,
-      width: 150,
-      height: 150,
-      transform: "rotate(35deg)",
-      border: "2px solid rgba(255,255,255,0.20)",
-      borderRadius: "28px",
-      boxShadow: "0 0 0 16px rgba(255,255,255,0.06)",
-      animation: "headerDecorationFloat 8s ease-in-out infinite",
-      animationDelay: "0.5s",
-    }}
-  />
-
-  {/* CÁC CHẤM TRANG TRÍ */}
-
-  <Box
-    sx={{
-      position: "absolute",
-      zIndex: -1,
-      bottom: 18,
-      left: { xs: 22, sm: 65 },
-      width: 9,
-      height: 9,
-      borderRadius: "50%",
-      backgroundColor: "#fef08a",
-      boxShadow:
-        "22px -14px 0 rgba(255,255,255,0.55), 44px 0 0 rgba(255,255,255,0.35)",
-    }}
-  />
-
-  <Box
-    sx={{
-      position: "absolute",
-      zIndex: -1,
-      top: 25,
-      right: { xs: 35, sm: 100 },
-      width: 7,
-      height: 7,
-      borderRadius: "50%",
-      backgroundColor: "#fde68a",
-      boxShadow:
-        "18px 15px 0 rgba(255,255,255,0.5), 35px -5px 0 rgba(255,255,255,0.3)",
-    }}
-  />
-
-  {/* NỘI DUNG TIÊU ĐỀ */}
-
-  <Box
-    sx={{
-      position: "relative",
-      zIndex: 1,
-    }}
-  >
-    {/* NÚT THOÁT */}
-
-    <IconButton
-      onClick={() => window.close()}
-      aria-label="Đóng phiếu học tập"
-      sx={{
-        position: "absolute",
-        top: { xs: 0, sm: 0 },
-        right: { xs: -10, sm: -16 },
-        width: { xs: 28, sm: 30 },
-        height: { xs: 28, sm: 30 },
-        color: "#fff",
-        bgcolor: "rgba(255,255,255,0.18)",
-        border: "1px solid rgba(255,255,255,0.55)",
-        borderRadius: "50%",
-        zIndex: 5,
-        "&:hover": {
-          bgcolor: "rgba(255,255,255,0.32)",
-        },
-      }}
-    >
-      <CloseIcon sx={{ fontSize: { xs: 17, sm: 19 } }} />
-    </IconButton>
-
-    {/* TIÊU ĐỀ CHÍNH */}
-
-    <Typography
-      sx={{
-        fontSize: { xs: 16, sm: 23 },
-        fontWeight: 900,
-        letterSpacing: { xs: 0.2, sm: 0.6 },
-        textTransform: "uppercase",
-        lineHeight: 1.25,
-        color: "#ffffff",
-        textShadow: "0 2px 3px rgba(0,60,100,0.15)",
-        animation: "headerTitleIn 800ms ease both",
-      }}
-    >
-      {worksheetInfo.title}
-    </Typography>
-
-    {/* DẢI TRANG TRÍ */}
-
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 0.8,
-        my: { xs: 0.8, sm: 1.1 },
-        animation: "headerLineIn 900ms ease both",
-        animationDelay: "200ms",
-      }}
-    >
-      <Box
-        sx={{
-          width: 28,
-          height: 2,
-          backgroundColor: "rgba(255,255,255,0.65)",
-          borderRadius: 2,
-        }}
-      />
-
-      <Box
-        sx={{
-          width: 7,
-          height: 7,
-          backgroundColor: "#fde68a",
-          transform: "rotate(45deg)",
-          borderRadius: "2px",
-          animation: "headerDiamond 3s ease-in-out infinite",
-        }}
-      />
-
-      <Box
-        sx={{
-          width: 28,
-          height: 2,
-          backgroundColor: "rgba(255,255,255,0.65)",
-          borderRadius: 2,
-        }}
-      />
-    </Box>
-
-    {/* TÊN BÀI HỌC */}
-
-    {worksheetInfo.lessonTitle && (
-      <Typography
-        sx={{
-          fontSize: { xs: 15, sm: 20 },
-          fontWeight: 900,
-          color: "#fff3b0",
-          textTransform: "uppercase",
-          lineHeight: 1.3,
-          textShadow: "0 2px 3px rgba(0,60,100,0.18)",
-          overflowWrap: "anywhere",
-          animation: "headerTitleIn 900ms ease both",
-          animationDelay: "300ms",
-        }}
-      >
-        {worksheetInfo.lessonTitle}
-      </Typography>
-    )}
-
-    {/* 3 CHIP CHỨC NĂNG TRÊN HEADER */}
-
-    <Box
-      sx={{
-        position: "relative",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        mt: { xs: 1, sm: 1.3 },
-        minHeight: { xs: 34, sm: 38 },
-      }}
-    >
-      {/* ĐỒNG HỒ */}
-
-      <Chip
-        icon={<AccessTimeIcon />}
-        label={
-          started || submitted
-            ? formatTime(timeLeft)
-            : `${timeLimitMinutes} phút`
-        }
-        sx={{
-          height: { xs: 34, sm: 38 },
-          fontSize: { xs: 15, sm: 17 },
-          fontWeight: 900,
-          color: "#fff",
-          backgroundColor: started
-            ? "#dc2626"
-            : "rgba(255,255,255,0.22)",
-          border: "1.5px solid rgba(255,255,255,0.75)",
-          borderRadius: "10px",
-          boxShadow: "0 2px 7px rgba(0,0,0,0.15)",
-          "& .MuiChip-icon": {
-            color: "#fff",
-            fontSize: { xs: 19, sm: 21 },
-            ml: 0.8,
-          },
-          "& .MuiChip-label": {
-            px: { xs: 1, sm: 1.3 },
-          },
-        }}
-      />
-
-      {/* HAI CHIP BÊN PHẢI */}
-
-      <Box
-        sx={{
-          position: "absolute",
-          right: 0,
-          display: { xs: "none", sm: "flex" },
-          alignItems: "center",
-          gap: 0.7,
-        }}
-      >
-        {/* CẤU HÌNH */}
-
-        <Chip
-          icon={<SettingsIcon />}
-          label="Cấu hình"
-          clickable
-          disabled={started}
-          onClick={() => setOpenTimeDialog(true)}
+        <Box
           sx={{
-            height: 32,
-            fontSize: 12,
-            fontWeight: 800,
-            color: "#fff",
-            backgroundColor: "rgba(255,255,255,0.20)",
-            border: "1px solid rgba(255,255,255,0.65)",
-            borderRadius: "8px",
-            "& .MuiChip-icon": {
-              color: "#fff",
-              fontSize: 17,
-              ml: 0.6,
-            },
-            "& .MuiChip-label": {
-              px: 0.8,
-            },
-            "&:hover": {
-              backgroundColor: "rgba(255,255,255,0.35)",
-            },
+            position: "absolute",
+            zIndex: -1,
+            top: -65,
+            left: -45,
+            width: 190,
+            height: 190,
+            border: "2px solid rgba(255,255,255,0.20)",
+            borderRadius: "50%",
+            boxShadow:
+              "0 0 0 18px rgba(255,255,255,0.07), 0 0 0 38px rgba(255,255,255,0.05)",
+            animation: "headerDecorationFloat 7s ease-in-out infinite",
           }}
         />
 
-        {/* SOẠN ĐỀ */}
+        {/* HOA VĂN GÓC PHẢI */}
 
-        <Chip
-          icon={<EditNoteRoundedIcon />}
-          label="Soạn đề"
-          clickable
-          onClick={() => setOpenSoanDialog(true)}
+        <Box
           sx={{
-            height: 32,
-            fontSize: 12,
-            fontWeight: 800,
-            color: "#fff",
-            backgroundColor: "rgba(255,255,255,0.20)",
-            border: "1px solid rgba(255,255,255,0.65)",
-            borderRadius: "8px",
-            "& .MuiChip-icon": {
-              color: "#fff",
-              fontSize: 17,
-              ml: 0.6,
-            },
-            "& .MuiChip-label": {
-              px: 0.8,
-            },
-            "&:hover": {
-              backgroundColor: "rgba(255,255,255,0.35)",
-            },
+            position: "absolute",
+            zIndex: -1,
+            top: -35,
+            right: -25,
+            width: 150,
+            height: 150,
+            transform: "rotate(35deg)",
+            border: "2px solid rgba(255,255,255,0.20)",
+            borderRadius: "28px",
+            boxShadow: "0 0 0 16px rgba(255,255,255,0.06)",
+            animation: "headerDecorationFloat 8s ease-in-out infinite",
+            animationDelay: "0.5s",
           }}
         />
+
+        {/* CÁC CHẤM TRANG TRÍ */}
+
+        <Box
+          sx={{
+            position: "absolute",
+            zIndex: -1,
+            bottom: 18,
+            left: { xs: 22, sm: 65 },
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            backgroundColor: "#fef08a",
+            boxShadow:
+              "22px -14px 0 rgba(255,255,255,0.55), 44px 0 0 rgba(255,255,255,0.35)",
+          }}
+        />
+
+        <Box
+          sx={{
+            position: "absolute",
+            zIndex: -1,
+            top: 25,
+            right: { xs: 35, sm: 100 },
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            backgroundColor: "#fde68a",
+            boxShadow:
+              "18px 15px 0 rgba(255,255,255,0.5), 35px -5px 0 rgba(255,255,255,0.3)",
+          }}
+        />
+
+        {/* NỘI DUNG TIÊU ĐỀ */}
+
+        <Box
+          sx={{
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {/* NÚT THOÁT */}
+
+          <IconButton
+            onClick={() => window.close()}
+            aria-label="Đóng phiếu học tập"
+            sx={{
+              position: "absolute",
+              top: { xs: 0, sm: 0 },
+              right: { xs: -10, sm: -16 },
+              width: { xs: 28, sm: 30 },
+              height: { xs: 28, sm: 30 },
+              color: "#fff",
+              bgcolor: "rgba(255,255,255,0.18)",
+              border: "1px solid rgba(255,255,255,0.55)",
+              borderRadius: "50%",
+              zIndex: 5,
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.32)",
+              },
+            }}
+          >
+            <CloseIcon sx={{ fontSize: { xs: 17, sm: 19 } }} />
+          </IconButton>
+
+          {/* TIÊU ĐỀ CHÍNH */}
+
+          <Typography
+            sx={{
+              fontSize: { xs: 16, sm: 23 },
+              fontWeight: 900,
+              letterSpacing: { xs: 0.2, sm: 0.6 },
+              textTransform: "uppercase",
+              lineHeight: 1.25,
+              color: "#ffffff",
+              textShadow: "0 2px 3px rgba(0,60,100,0.15)",
+              animation: "headerTitleIn 800ms ease both",
+            }}
+          >
+            {worksheetInfo.title}
+          </Typography>
+
+          {/* DẢI TRANG TRÍ */}
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 0.8,
+              my: { xs: 0.8, sm: 1.1 },
+              animation: "headerLineIn 900ms ease both",
+              animationDelay: "200ms",
+            }}
+          >
+            <Box
+              sx={{
+                width: 28,
+                height: 2,
+                backgroundColor: "rgba(255,255,255,0.65)",
+                borderRadius: 2,
+              }}
+            />
+
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                backgroundColor: "#fde68a",
+                transform: "rotate(45deg)",
+                borderRadius: "2px",
+                animation: "headerDiamond 3s ease-in-out infinite",
+              }}
+            />
+
+            <Box
+              sx={{
+                width: 28,
+                height: 2,
+                backgroundColor: "rgba(255,255,255,0.65)",
+                borderRadius: 2,
+              }}
+            />
+          </Box>
+
+          {/* TÊN BÀI HỌC */}
+
+          {worksheetInfo.lessonTitle && (
+            <Typography
+              sx={{
+                fontSize: { xs: 15, sm: 20 },
+                fontWeight: 900,
+                color: "#fff3b0",
+                textTransform: "uppercase",
+                lineHeight: 1.3,
+                textShadow: "0 2px 3px rgba(0,60,100,0.18)",
+                overflowWrap: "anywhere",
+                animation: "headerTitleIn 900ms ease both",
+                animationDelay: "300ms",
+              }}
+            >
+              {worksheetInfo.lessonTitle}
+            </Typography>
+          )}
+
+          {/* 3 CHIP CHỨC NĂNG TRÊN HEADER */}
+
+          <Box
+            sx={{
+              position: "relative",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              mt: { xs: 1, sm: 1.3 },
+              minHeight: { xs: 34, sm: 38 },
+            }}
+          >
+            {/* ĐỒNG HỒ */}
+
+            <Chip
+              icon={<AccessTimeIcon />}
+              label={
+                started || submitted
+                  ? formatTime(timeLeft)
+                  : `${timeLimitMinutes} phút`
+              }
+              sx={{
+                height: { xs: 34, sm: 38 },
+                fontSize: { xs: 15, sm: 17 },
+                fontWeight: 900,
+                color: "#fff",
+                backgroundColor: started
+                  ? "#dc2626"
+                  : "rgba(255,255,255,0.22)",
+                border: "1.5px solid rgba(255,255,255,0.75)",
+                borderRadius: "10px",
+                boxShadow: "0 2px 7px rgba(0,0,0,0.15)",
+                "& .MuiChip-icon": {
+                  color: "#fff",
+                  fontSize: { xs: 19, sm: 21 },
+                  ml: 0.8,
+                },
+                "& .MuiChip-label": {
+                  px: { xs: 1, sm: 1.3 },
+                },
+              }}
+            />
+
+            {/* HAI CHIP BÊN PHẢI */}
+
+            <Box
+              sx={{
+                position: "absolute",
+                right: 0,
+                display: { xs: "none", sm: "flex" },
+                alignItems: "center",
+                gap: 0.7,
+              }}
+            >
+              {/* CẤU HÌNH */}
+
+              <Chip
+                icon={<SettingsIcon />}
+                label="Cấu hình"
+                clickable
+                disabled={started}
+                onClick={() => setOpenTimeDialog(true)}
+                sx={{
+                  height: 32,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "#fff",
+                  backgroundColor: "rgba(255,255,255,0.20)",
+                  border: "1px solid rgba(255,255,255,0.65)",
+                  borderRadius: "8px",
+                  "& .MuiChip-icon": {
+                    color: "#fff",
+                    fontSize: 17,
+                    ml: 0.6,
+                  },
+                  "& .MuiChip-label": {
+                    px: 0.8,
+                  },
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.35)",
+                  },
+                }}
+              />
+
+              {/* SOẠN ĐỀ */}
+
+              <Chip
+                icon={<EditNoteRoundedIcon />}
+                label="Soạn đề"
+                clickable
+                onClick={() => setOpenSoanDialog(true)}
+                sx={{
+                  height: 32,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "#fff",
+                  backgroundColor: "rgba(255,255,255,0.20)",
+                  border: "1px solid rgba(255,255,255,0.65)",
+                  borderRadius: "8px",
+                  "& .MuiChip-icon": {
+                    color: "#fff",
+                    fontSize: 17,
+                    ml: 0.6,
+                  },
+                  "& .MuiChip-label": {
+                    px: 0.8,
+                  },
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.35)",
+                  },
+                }}
+              />
+
+              <Chip
+                icon={<PictureAsPdfRoundedIcon />}
+                label="Xuất PDF"
+                clickable
+                onClick={handleExportPDF}
+                sx={{
+                  height: 32,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "#fff",
+                  backgroundColor: "rgba(255,255,255,0.20)",
+                  border: "1px solid rgba(255,255,255,0.65)",
+                  borderRadius: "8px",
+                  "& .MuiChip-icon": {
+                    color: "#fff",
+                    fontSize: 17,
+                    ml: 0.6,
+                  },
+                  "& .MuiChip-label": {
+                    px: 0.8,
+                  },
+                  "&:hover": {
+                    backgroundColor: "rgba(255,255,255,0.35)",
+                  },
+                }}
+              />
+            </Box>
+          </Box>
+
+          {/* CHIP CHỨC NĂNG TRÊN ĐIỆN THOẠI */}
+
+          <Box
+            sx={{
+              display: { xs: "flex", sm: "none" },
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 0.8,
+              mt: 0.8,
+            }}
+          >
+            <Chip
+              icon={<SettingsIcon />}
+              label="Cấu hình"
+              clickable
+              disabled={started}
+              onClick={() => setOpenTimeDialog(true)}
+              sx={{
+                height: 28,
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#fff",
+                backgroundColor: "rgba(255,255,255,0.20)",
+                border: "1px solid rgba(255,255,255,0.65)",
+                borderRadius: "8px",
+                "& .MuiChip-icon": {
+                  color: "#fff",
+                  fontSize: 15,
+                  ml: 0.6,
+                },
+                "& .MuiChip-label": {
+                  px: 0.7,
+                },
+              }}
+            />
+
+            <Chip
+              icon={<EditNoteRoundedIcon />}
+              label="Soạn đề"
+              clickable
+              onClick={() => setOpenSoanDialog(true)}
+              sx={{
+                height: 28,
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#fff",
+                backgroundColor: "rgba(255,255,255,0.20)",
+                border: "1px solid rgba(255,255,255,0.65)",
+                borderRadius: "8px",
+                "& .MuiChip-icon": {
+                  color: "#fff",
+                  fontSize: 15,
+                  ml: 0.6,
+                },
+                "& .MuiChip-label": {
+                  px: 0.7,
+                },
+              }}
+            />
+          </Box>
+        </Box>
       </Box>
-    </Box>
 
-    {/* CHIP CHỨC NĂNG TRÊN ĐIỆN THOẠI */}
-
-    <Box
-      sx={{
-        display: { xs: "flex", sm: "none" },
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 0.8,
-        mt: 0.8,
-      }}
-    >
-      <Chip
-        icon={<SettingsIcon />}
-        label="Cấu hình"
-        clickable
-        disabled={started}
-        onClick={() => setOpenTimeDialog(true)}
-        sx={{
-          height: 28,
-          fontSize: 10,
-          fontWeight: 800,
-          color: "#fff",
-          backgroundColor: "rgba(255,255,255,0.20)",
-          border: "1px solid rgba(255,255,255,0.65)",
-          borderRadius: "8px",
-          "& .MuiChip-icon": {
-            color: "#fff",
-            fontSize: 15,
-            ml: 0.6,
-          },
-          "& .MuiChip-label": {
-            px: 0.7,
-          },
-        }}
-      />
-
-      <Chip
-        icon={<EditNoteRoundedIcon />}
-        label="Soạn đề"
-        clickable
-        onClick={() => setOpenSoanDialog(true)}
-        sx={{
-          height: 28,
-          fontSize: 10,
-          fontWeight: 800,
-          color: "#fff",
-          backgroundColor: "rgba(255,255,255,0.20)",
-          border: "1px solid rgba(255,255,255,0.65)",
-          borderRadius: "8px",
-          "& .MuiChip-icon": {
-            color: "#fff",
-            fontSize: 15,
-            ml: 0.6,
-          },
-          "& .MuiChip-label": {
-            px: 0.7,
-          },
-        }}
-      />
-    </Box>
-  </Box>
-</Box>
-
-</Paper>
+      </Paper>
 
       {/* DANH SÁCH CÂU HỎI */}
 
@@ -1954,6 +1994,7 @@ useEffect(() => {
             >
               NỘP BÀI
             </Button>
+            
           )}
 
           {submitted && (
